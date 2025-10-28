@@ -1,0 +1,250 @@
+{% extends 'base.html' %}
+
+{% block title %}Registro de Asiento{% endblock %}
+{% block page_title %}Registrar Nuevo Asiento Diario{% endblock %}
+
+{% block content %}
+<form method="POST" id="asientoForm">
+    {% csrf_token %}
+    
+    <!-- Bloque 1: Encabezado del Asiento -->
+    <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+        <h3 class="text-xl font-semibold text-sic-dark-blue mb-4">1. Encabezado del Asiento</h3>
+        
+        <!-- Errores no ligados al formulario (ej. descuadre) -->
+        {% if asiento_form.non_field_errors or movimiento_formset.non_field_errors %}
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md mb-4" role="alert">
+            <strong class="font-bold">Error:</strong>
+            {% for error in asiento_form.non_field_errors %}
+                <span class="block sm:inline">{{ error }}</span>
+            {% endfor %}
+            {% for error in movimiento_formset.non_field_errors %}
+                <span class="block sm:inline">{{ error }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <!-- Fecha -->
+            <div class="md:col-span-1">
+                <label for="{{ asiento_form.fecha.id_for_label }}" class="block text-sm font-medium text-gray-700">Fecha</label>
+                {{ asiento_form.fecha }}
+                {% if asiento_form.fecha.errors %}
+                <p class="text-red-500 text-xs mt-1">{{ asiento_form.fecha.errors.0 }}</p>
+                {% endif %}
+            </div>
+            <!-- Período -->
+            <div class="md:col-span-1">
+                <label for="{{ asiento_form.periodo.id_for_label }}" class="block text-sm font-medium text-gray-700">Período Contable</label>
+                {{ asiento_form.periodo }}
+                {% if asiento_form.periodo.errors %}
+                <p class="text-red-500 text-xs mt-1">{{ asiento_form.periodo.errors.0 }}</p>
+                {% endif %}
+            </div>
+            <!-- Descripción -->
+            <div class="md:col-span-2">
+                <label for="{{ asiento_form.descripcion.id_for_label }}" class="block text-sm font-medium text-gray-700">Descripción (Concepto)</label>
+                {{ asiento_form.descripcion }}
+                {% if asiento_form.descripcion.errors %}
+                <p class="text-red-500 text-xs mt-1">{{ asiento_form.descripcion.errors.0 }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Bloque 2: Movimientos (Formset) -->
+    <div class="bg-white p-6 rounded-lg shadow-md">
+        <h3 class="text-xl font-semibold text-sic-dark-blue mb-4">2. Movimientos (Partida Doble)</h3>
+        
+        <!-- El Management Form es OBLIGATORIO para que el Formset funcione -->
+        {{ movimiento_formset.management_form }}
+        
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-lg">
+                <!-- Encabezados de la tabla -->
+                <thead>
+                    <tr class="border-b-2 border-gray-300">
+                        <th class="text-left text-sm font-semibold text-gray-600 p-3 w-5/12">Cuenta Contable</th>
+                        <th class="text-right text-sm font-semibold text-gray-600 p-3 w-3/12">Debe ($)</th>
+                        <th class="text-right text-sm font-semibold text-gray-600 p-3 w-3/12">Haber ($)</th>
+                        <th class="text-center text-sm font-semibold text-gray-600 p-3 w-1/12">Eliminar</th>
+                    </tr>
+                </thead>
+                <!-- Contenedor para las líneas de movimiento (JS) -->
+                <tbody id="movimiento-form-list">
+                    {% for form in movimiento_formset %}
+                    <tr class="movimiento-form border-b border-gray-200">
+                        {{ form.id }} {# Campo oculto ID del movimiento #}
+                        <td class="p-2">{{ form.cuenta }}</td>
+                        <td class="p-2">{{ form.debe }}</td>
+                        <td class="p-2">{{ form.haber }}</td>
+                        <td class="p-2 text-center">
+                            {% if form.instance.pk %}
+                                {{ form.DELETE }}
+                            {% else %}
+                                <button type="button" class="remove-movimiento-form text-red-500 hover:text-red-700 text-2xl" title="Eliminar línea">&times;</button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <!-- Errores por línea -->
+                    {% if form.errors %}
+                    <tr class="bg-red-50">
+                        <td colspan="4" class="p-2 text-red-600 text-sm">
+                            {% for field, error in form.errors.items %}
+                                {{ field }}: {{ error.0 }} 
+                            {% endfor %}
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+                <!-- Totales -->
+                <tfoot class="bg-gray-100">
+                    <tr>
+                        <td class="p-3 text-right font-bold text-gray-700">TOTALES:</td>
+                        <td class="p-3 text-right">
+                            <input type="text" id="total-debe" class="w-full text-right bg-gray-200 rounded-md border-gray-300 font-bold" value="0.00" readonly>
+                        </td>
+                        <td class="p-3 text-right">
+                            <input type="text" id="total-haber" class="w-full text-right bg-gray-200 rounded-md border-gray-300 font-bold" value="0.00" readonly>
+                        </td>
+                        <td class="p-3"></td>
+                    </tr>
+                    <tr>
+                        <td class="p-3 text-right font-bold text-gray-700">DIFERENCIA:</td>
+                        <td colspan="2" class="p-3">
+                            <input type="text" id="diferencia" class="w-full text-center bg-gray-200 rounded-md border-gray-300 font-bold text-red-600" value="0.00" readonly>
+                        </td>
+                        <td class="p-3"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <!-- Botón para añadir más líneas (JS) -->
+        <div class="mt-4">
+            <button type="button" id="add-movimiento-form" class="bg-sic-light-teal hover:bg-sic-teal text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-colors duration-200">
+                + Añadir Línea
+            </button>
+        </div>
+    </div>
+    
+    <!-- Bloque 3: Acciones -->
+    <div class="mt-6 flex justify-end space-x-4">
+        <a href="{% url 'contabilidad:dashboard' %}" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-5 rounded-lg">Cancelar</a>
+        <button type="submit" class="bg-sic-medium-blue hover:bg-sic-dark-blue text-white font-bold py-2 px-6 rounded-lg shadow-md transition-colors duration-200">
+            Guardar Asiento
+        </button>
+    </div>
+</form>
+
+<!-- Plantilla para el formulario vacío de JS (Oculto) -->
+<table class="hidden">
+    <tbody id="empty-form-template">
+        <tr class="movimiento-form border-b border-gray-200">
+            {{ movimiento_formset.empty_form.id }}
+            <td class="p-2">{{ movimiento_formset.empty_form.cuenta }}</td>
+            <td class="p-2">{{ movimiento_formset.empty_form.debe }}</td>
+            <td class="p-2">{{ movimiento_formset.empty_form.haber }}</td>
+            <td class="p-2 text-center">
+                <button type="button" class="remove-movimiento-form text-red-500 hover:text-red-700 text-2xl" title="Eliminar línea">&times;</button>
+            </td>
+        </tr>
+    </tbody>
+</table>
+<!-- Fin de la plantilla oculta -->
+
+
+<!-- JavaScript para Formsets Dinámicos y Cálculos -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const formList = document.getElementById('movimiento-form-list');
+    const addButton = document.getElementById('add-movimiento-form');
+    const emptyFormTemplate = document.getElementById('empty-form-template').innerHTML;
+    const totalFormsInput = document.getElementById('id_movimientos-TOTAL_FORMS');
+    
+    // --- 1. Añadir nueva línea de formulario ---
+    addButton.addEventListener('click', function() {
+        // Obtener el índice actual
+        let formIndex = parseInt(totalFormsInput.value);
+        
+        // Crear el nuevo HTML reemplazando el prefijo
+        let newFormHTML = emptyFormTemplate.replace(/__prefix__/g, formIndex);
+        
+        // Crear un nuevo TR y añadir el HTML
+        let newRow = document.createElement('tr');
+        newRow.innerHTML = newFormHTML.match(/<tr class="movimiento-form.*?<\/tr>/s)[0];
+        formList.appendChild(newRow.firstElementChild);
+        
+        // Actualizar el contador TOTAL_FORMS
+        totalFormsInput.value = formIndex + 1;
+        
+        // Añadir listeners a los nuevos inputs
+        attachListenersToRow(newRow);
+        updateTotals();
+    });
+
+    // --- 2. Eliminar línea de formulario ---
+    formList.addEventListener('click', function(e) {
+        if (e.target && e.target.classList.contains('remove-movimiento-form')) {
+            e.preventDefault();
+            // Encontrar la fila (TR) padre y eliminarla
+            let row = e.target.closest('.movimiento-form');
+            if (row) {
+                row.remove();
+                updateTotals();
+                // (No se decrementa TOTAL_FORMS para manejar correctamente la eliminación)
+            }
+        }
+    });
+
+    // --- 3. Calcular Totales ---
+    const totalDebeEl = document.getElementById('total-debe');
+    const totalHaberEl = document.getElementById('total-haber');
+    const diferenciaEl = document.getElementById('diferencia');
+
+    function updateTotals() {
+        let totalDebe = 0;
+        let totalHaber = 0;
+        
+        document.querySelectorAll('.movimiento-form').forEach(function(row) {
+            let debeInput = row.querySelector('.debe-input');
+            let haberInput = row.querySelector('.haber-input');
+            
+            if (debeInput && haberInput) {
+                totalDebe += parseFloat(debeInput.value) || 0;
+                totalHaber += parseFloat(haberInput.value) || 0;
+            }
+        });
+
+        totalDebeEl.value = totalDebe.toFixed(2);
+        totalHaberEl.value = totalHaber.toFixed(2);
+        
+        let diferencia = totalDebe - totalHaber;
+        diferenciaEl.value = diferencia.toFixed(2);
+        
+        // Cambiar color de la diferencia
+        if (diferencia.toFixed(2) === '0.00') {
+            diferenciaEl.classList.remove('text-red-600');
+            diferenciaEl.classList.add('text-green-600');
+        } else {
+            diferenciaEl.classList.remove('text-green-600');
+            diferenciaEl.classList.add('text-red-600');
+        }
+    }
+
+    // --- 4. Adjuntar Listeners (para inputs nuevos y existentes) ---
+    function attachListenersToRow(row) {
+        row.querySelectorAll('.debe-input, .haber-input').forEach(function(input) {
+            input.addEventListener('input', updateTotals);
+        });
+    }
+
+    // Adjuntar listeners a las filas iniciales
+    document.querySelectorAll('.movimiento-form').forEach(attachListenersToRow);
+    
+    // Calcular totales al cargar la página
+    updateTotals();
+});
+</script>
+{% endblock %}
