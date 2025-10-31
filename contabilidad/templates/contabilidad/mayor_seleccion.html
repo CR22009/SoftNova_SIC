@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+
+{% block title %}Libro Mayor y Balanza{% endblock %}
+{% block page_title %}Reportes Contables{% endblock %}
+
+{% block header_action %}{% endblock %} <!-- Ocultar botón 'Nuevo Asiento' aquí -->
+
+{% block content %}
+
+<!-- Bloque 1: Selector de Período -->
+<div class="bg-white p-6 rounded-lg shadow-md mb-6">
+    <h3 class="text-xl font-semibold text-sic-dark-blue mb-4">1. Seleccione un Período</h3>
+    
+    <form method="GET" action="{% url 'contabilidad:mayor_seleccion' %}">
+        <div class="flex items-end space-x-4">
+            <div class="flex-1">
+                <label for="periodo_id" class="block text-sm font-medium text-gray-700">Período Contable</label>
+                <select name="periodo_id" id="periodo_id" class="block w-full mt-1 rounded-md border-gray-300 shadow-sm focus:border-sic-teal focus:ring-sic-teal">
+                    <option value="">-- Seleccione un período --</option>
+                    {% for p in periodos %}
+                    <option value="{{ p.id }}" {% if periodo_seleccionado.id == p.id %}selected{% endif %}>
+                        {{ p.nombre }} ({{ p.fecha_inicio|date:"d/m/y" }} al {{ p.fecha_fin|date:"d/m/y" }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="bg-sic-medium-blue hover:bg-sic-dark-blue text-white font-semibold py-2 px-4 rounded-lg shadow-md">
+                Cargar Reportes
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Solo mostrar si se ha seleccionado un período -->
+{% if periodo_seleccionado %}
+<!-- Bloque 2: Acciones (Balanza de Comprobación) -->
+<div class="bg-white p-6 rounded-lg shadow-md mb-6">
+    <h3 class="text-xl font-semibold text-sic-dark-blue mb-4">2. Balance de Comprobación</h3>
+    <p class="text-gray-600 mb-4">Generar el reporte de saldos finales para todas las cuentas en el período seleccionado.</p>
+    <a href="{% url 'contabilidad:balanza_comprobacion' periodo_id=periodo_seleccionado.id %}" target="_blank" class="inline-block bg-sic-teal hover:bg-sic-light-teal text-white font-semibold py-2 px-5 rounded-lg shadow-md">
+        Ver Balance de Comprobación
+    </a>
+</div>
+
+
+<!-- Bloque 3: Libro Mayor (Selección de Cuenta) -->
+<div class="bg-white p-6 rounded-lg shadow-md">
+    <h3 class="text-xl font-semibold text-sic-dark-blue mb-4">3. Libro Mayor (Cuentas T)</h3>
+    <p class="text-gray-600 mb-4">Seleccione una cuenta para ver el detalle de sus movimientos (Cuenta T). Solo se muestran cuentas con actividad en el período.</p>
+    
+    <!-- Buscador de Cuentas (JS) -->
+    <div class="mb-4">
+        <label for="buscador_cuentas" class="block text-sm font-medium text-gray-700">Buscar Cuenta (por nombre o código)</label>
+        <input type="text" id="buscador_cuentas" class="block w-full md:w-1/2 mt-1 rounded-md border-gray-300 shadow-sm focus:border-sic-teal focus:ring-sic-teal" placeholder="Ej. 113 o Banco Local...">
+    </div>
+
+    <!-- Lista de Cuentas -->
+    <div class="overflow-y-auto max-h-96 border border-gray-200 rounded-md">
+        <ul id="lista_cuentas" class="divide-y divide-gray-200">
+            {% for cuenta in cuentas %}
+            <!-- Fila de la lista, con data-nombre para el buscador JS -->
+            <li class="p-4 hover:bg-gray-50 item-cuenta" data-nombre="{{ cuenta.codigo }} {{ cuenta.nombre|lower }}">
+                <a href="{% url 'contabilidad:libro_mayor_detalle' periodo_id=periodo_seleccionado.id cuenta_id=cuenta.id %}" target="_blank" class="flex justify-between items-center">
+                    <div>
+                        <span class="font-medium text-sic-medium-blue">{{ cuenta.codigo }} - {{ cuenta.nombre }}</span>
+                        <span class="block text-sm text-gray-500">{{ cuenta.get_tipo_cuenta_display }} / {{ cuenta.get_naturaleza_display }}</span>
+                    </div>
+                    <span class="text-sic-teal font-semibold text-lg">&rarr;</span>
+                </a>
+            </li>
+            {% empty %}
+            <li class="p-4 text-center text-gray-500" id="empty-message">
+                No se encontraron cuentas con movimientos en este período.
+            </li>
+            {% endfor %}
+            <li class="p-4 text-center text-gray-500 hidden" id="no-results-message">
+                No hay resultados para su búsqueda.
+            </li>
+        </ul>
+    </div>
+</div>
+
+<!-- Script para el buscador de cuentas -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const buscador = document.getElementById('buscador_cuentas');
+    const items = document.querySelectorAll('#lista_cuentas .item-cuenta');
+    const emptyMessage = document.getElementById('empty-message');
+    const noResultsMessage = document.getElementById('no-results-message');
+
+    buscador.addEventListener('input', function(e) {
+        const termino = e.target.value.toLowerCase();
+        let visibleCount = 0;
+        
+        items.forEach(function(item) {
+            const nombre = item.getAttribute('data-nombre');
+            if (nombre.includes(termino)) {
+                item.style.display = 'list-item'; // 'list-item' para respetar el <li>
+                visibleCount++;
+            } else {
+                item.style.display = 'none';
+            }
+        });
+
+        // Ocultar mensajes de "no hay"
+        if (emptyMessage) emptyMessage.style.display = 'none';
+        if (noResultsMessage) noResultsMessage.style.display = 'none';
+
+        // Mostrar el mensaje "no hay resultados" si es apropiado
+        if (visibleCount === 0 && items.length > 0) {
+            if (noResultsMessage) noResultsMessage.style.display = 'list-item';
+        }
+
+        // Mostrar mensaje de "no hay cuentas" si la lista original estaba vacía
+        if (items.length === 0) {
+             if (emptyMessage) emptyMessage.style.display = 'list-item';
+        }
+    });
+});
+</script>
+
+{% endif %} <!-- *** ESTE ES EL CIERRE QUE FALTABA O ESTABA CORRUPTO *** -->
+
+{% endblock %}
+
