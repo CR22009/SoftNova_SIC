@@ -63,7 +63,7 @@
                 <ul class="space-y-2">
                     <!-- Dashboard (Ejemplo) -->
                     <li>
-                        <a href="#" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
+                        <a href="{% url 'contabilidad:dashboard' %}" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
                             <ion-icon name="grid-outline" class="text-xl"></ion-icon>
                             <span class="font-medium">Dashboard</span>
                         </a>
@@ -74,7 +74,7 @@
                     
                     <!-- 1. Registro de Transacciones -->
                     <li>
-                        <a href="#" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
+                        <a href="{% url 'contabilidad:registrar_asiento' %}" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
                             <ion-icon name="create-outline" class="text-xl"></ion-icon>
                             <span class="font-medium">Registro Transacciones</span>
                         </a>
@@ -82,7 +82,7 @@
                     
                     <!-- 2. Mayorización (Cuentas T) -->
                     <li>
-                        <a href="#" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
+                        <a href="{% url 'contabilidad:mayor_seleccion' %}" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
                             <ion-icon name="book-outline" class="text-xl"></ion-icon>
                             <span class="font-medium">Libro Mayor</span>
                         </a>
