@@ -7,11 +7,13 @@ from .models import AsientoDiario, PeriodoContable, Cuenta, Movimiento
 from .forms import AsientoDiarioForm, MovimientoFormSet
 from decimal import Decimal
 
-# --- Verificación de Roles (Existente) ---
+
+
+# -------------- Verificación de Roles---------
 def es_contador_o_admin(user):
     return user.is_staff or user.is_superuser
 
-# --- Dashboard (Existente) ---
+# -------------- Dashboard --------------
 @login_required
 def dashboard(request):
     ultimos_asientos = AsientoDiario.objects.order_by('-fecha', '-numero_partida')[:5]
@@ -22,7 +24,7 @@ def dashboard(request):
     }
     return render(request, 'contabilidad/dashboard.html', context)
 
-# --- Registro de Asientos (Existente) ---
+# -------------- Registro de Asientos ----------------
 @login_required
 @user_passes_test(es_contador_o_admin, login_url='/admin/login/')
 @transaction.atomic
@@ -69,7 +71,7 @@ def registrar_asiento(request):
     return render(request, 'contabilidad/registro_asiento.html', context)
 
 
-# --- FASE 2 - Vistas de Mayorización ---
+# -------------- Vistas de Mayorización --------------
 
 @login_required
 @user_passes_test(es_contador_o_admin, login_url='/admin/login/')
@@ -103,7 +105,7 @@ def mayor_seleccion(request):
     }
     return render(request, 'contabilidad/mayor_seleccion.html', context)
 
-
+# -------------- Detalle de cuentas del Libro Mayor --------------
 @login_required
 @user_passes_test(es_contador_o_admin, login_url='/admin/login/')
 def libro_mayor_detalle(request, periodo_id, cuenta_id):
@@ -150,7 +152,7 @@ def libro_mayor_detalle(request, periodo_id, cuenta_id):
     }
     return render(request, 'contabilidad/libro_mayor_detalle.html', context)
 
-
+# -------------- Balance de Comprobación --------------
 @login_required
 @user_passes_test(es_contador_o_admin, login_url='/admin/login/')
 def balanza_comprobacion(request, periodo_id):
@@ -218,3 +220,151 @@ def balanza_comprobacion(request, periodo_id):
         'esta_cuadrado': diferencia.quantize(Decimal('0.01')) == Decimal('0.00')
     }
     return render(request, 'contabilidad/balanza_comprobacion.html', context)
+
+# --- ========================================= ---
+# ---              Estados Financieros          ---
+# --- ========================================= ---
+
+def _calcular_saldos_cuentas_por_tipo(periodo, tipo_cuenta):
+    """
+    Función auxiliar para calcular los saldos de todas las cuentas imputables
+    de un tipo específico (ej. 'ACTIVO') para un período.
+    Retorna una lista de diccionarios y el total.
+    """
+    cuentas = Cuenta.objects.filter(tipo_cuenta=tipo_cuenta, es_imputable=True).order_by('codigo')
+    lista_saldos = []
+    total_general_tipo = Decimal('0.00')
+
+    for c in cuentas:
+        agregado = Movimiento.objects.filter(asiento__periodo=periodo, cuenta=c).aggregate(
+            total_debe=models.Sum('debe'),
+            total_haber=models.Sum('haber')
+        )
+        total_debe = agregado.get('total_debe') or Decimal('0.00')
+        total_haber = agregado.get('total_haber') or Decimal('0.00')
+        
+        saldo = Decimal('0.00')
+        if total_debe > 0 or total_haber > 0: # Solo procesar si hay movimiento
+            # Naturaleza Deudora (Activo, Costo, Gasto)
+            if c.naturaleza == Cuenta.NaturalezaCuenta.DEUDORA:
+                saldo = total_debe - total_haber
+            # Naturaleza Acreedora (Pasivo, Patrimonio, Ingreso)
+            else:
+                saldo = total_haber - total_debe
+        
+        if saldo != Decimal('0.00'):
+            lista_saldos.append({'cuenta': c, 'saldo': saldo})
+            total_general_tipo += saldo
+    
+    return lista_saldos, total_general_tipo
+
+def _get_utilidad_del_ejercicio(periodo):
+    """
+    Función auxiliar que calcula la Utilidad (o Pérdida) del Ejercicio.
+    Utilidad = Ingresos - Costos - Gastos
+    """
+    _, total_ingresos = _calcular_saldos_cuentas_por_tipo(periodo, Cuenta.TipoCuenta.INGRESO)
+    _, total_costos = _calcular_saldos_cuentas_por_tipo(periodo, Cuenta.TipoCuenta.COSTO)
+    _, total_gastos = _calcular_saldos_cuentas_por_tipo(periodo, Cuenta.TipoCuenta.GASTO)
+    
+    utilidad = total_ingresos - (total_costos + total_gastos)
+    return utilidad
+
+@login_required
+@user_passes_test(es_contador_o_admin, login_url='/admin/login/')
+def estado_resultados(request, periodo_id):
+    """
+    Muestra el Estado de Resultados (Ingresos - Costos - Gastos)
+    """
+    periodo = get_object_or_404(PeriodoContable, pk=periodo_id)
+    
+    lista_ingresos, total_ingresos = _calcular_saldos_cuentas_por_tipo(periodo, Cuenta.TipoCuenta.INGRESO)
+    lista_costos, total_costos = _calcular_saldos_cuentas_por_tipo(periodo, Cuenta.TipoCuenta.COSTO)
+    lista_gastos, total_gastos = _calcular_saldos_cuentas_por_tipo(periodo, Cuenta.TipoCuenta.GASTO)
+    
+    # Cálculos para el reporte
+    utilidad_bruta = total_ingresos - total_costos
+    utilidad_neta = utilidad_bruta - total_gastos # Simplificación (Utilidad antes de Impuestos)
+
+    context = {
+        'periodo': periodo,
+        'lista_ingresos': lista_ingresos,
+        'total_ingresos': total_ingresos,
+        'lista_costos': lista_costos,
+        'total_costos': total_costos,
+        'lista_gastos': lista_gastos,
+        'total_gastos': total_gastos,
+        'utilidad_bruta': utilidad_bruta,
+        'utilidad_neta': utilidad_neta,
+    }
+    return render(request, 'contabilidad/estado_resultados.html', context)
+
+@login_required
+@user_passes_test(es_contador_o_admin, login_url='/admin/login/')
+def balance_general(request, periodo_id):
+    """
+    Muestra el Balance General (Activo = Pasivo + Patrimonio)
+    """
+    periodo = get_object_or_404(PeriodoContable, pk=periodo_id)
+    
+    # 1. Calcular Activos
+    lista_activos, total_activos = _calcular_saldos_cuentas_por_tipo(periodo, Cuenta.TipoCuenta.ACTIVO)
+    
+    # 2. Calcular Pasivos
+    lista_pasivos, total_pasivos = _calcular_saldos_cuentas_por_tipo(periodo, Cuenta.TipoCuenta.PASIVO)
+    
+    # 3. Calcular Patrimonio (Histórico, sin utilidad del ejercicio)
+    lista_patrimonio, total_patrimonio = _calcular_saldos_cuentas_por_tipo(periodo, Cuenta.TipoCuenta.PATRIMONIO)
+    
+    # 4. Calcular Utilidad del Ejercicio (del Estado de Resultados)
+    utilidad_ejercicio = _get_utilidad_del_ejercicio(periodo)
+    
+    # 5. Calcular Totales para la Ecuación
+    total_patrimonio_final = total_patrimonio + utilidad_ejercicio
+    total_pasivo_patrimonio = total_pasivos + total_patrimonio_final
+    
+    # 6. Verificación de cuadratura
+    diferencia = total_activos - total_pasivo_patrimonio
+    esta_cuadrado = diferencia.quantize(Decimal('0.01')) == Decimal('0.00')
+
+    context = {
+        'periodo': periodo,
+        'lista_activos': lista_activos,
+        'total_activos': total_activos,
+        'lista_pasivos': lista_pasivos,
+        'total_pasivos': total_pasivos,
+        'lista_patrimonio': lista_patrimonio,
+        'total_patrimonio': total_patrimonio,
+        'utilidad_ejercicio': utilidad_ejercicio,
+        'total_patrimonio_final': total_patrimonio_final,
+        'total_pasivo_patrimonio': total_pasivo_patrimonio,
+        'diferencia': diferencia,
+        'esta_cuadrado': esta_cuadrado,
+    }
+    return render(request, 'contabilidad/balance_general.html', context)
+
+@login_required
+@user_passes_test(es_contador_o_admin, login_url='/admin/login/')
+def ver_catalogo(request):
+    """
+    Vista de SOLO LECTURA del catálogo de cuentas para el rol 'Contador'.
+    """
+    # Obtenemos solo las cuentas de nivel superior (padre=None)
+    # El template se encargará de mostrar los hijos recursivamente
+    cuentas_principales = Cuenta.objects.filter(padre__isnull=True).order_by('codigo')
+    context = {
+        'cuentas_principales': cuentas_principales,
+    }
+    return render(request, 'contabilidad/catalogo_readonly.html', context)
+
+@login_required
+@user_passes_test(es_contador_o_admin, login_url='/admin/login/')
+def ver_periodos(request):
+    """
+    Vista de SOLO LECTURA de los períodos contables para el rol 'Contador'.
+    """
+    periodos = PeriodoContable.objects.all().order_by('-fecha_inicio')
+    context = {
+        'periodos': periodos,
+    }
+    return render(request, 'contabilidad/periodos_readonly.html', context)

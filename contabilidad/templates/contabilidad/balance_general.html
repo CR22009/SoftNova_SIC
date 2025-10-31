@@ -1,0 +1,156 @@
+{% extends 'base.html' %}
+
+{% block title %}Balance General{% endblock %}
+{% block page_title %}Balance General{% endblock %}
+
+{% block header_action %}
+    <a href="javascript:window.print()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg shadow-md transition-colors duration-200 flex items-center space-x-2 no-print">
+        <ion-icon name="print-outline" class="text-xl"></ion-icon>
+        <span>Imprimir</span>
+    </a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Encabezado del Reporte -->
+<div class="bg-white p-6 rounded-lg shadow-md mb-6">
+    <div class="text-center">
+        <h2 class="text-2xl font-bold text-sic-dark-blue">SoftNova S.A. de C.V.</h2>
+        <h3 class="text-xl font-semibold text-gray-700">Estado de Situación Financiera (Balance General)</h3>
+        <p class="text-lg text-gray-600">Al {{ periodo.fecha_fin|date:"d \d\e F \d\e Y" }}</p>
+        <p class="text-sm text-gray-500">(Valores expresados en Dólares de los Estados Unidos)</p>
+    </div>
+    <a href="{% url 'contabilidad:mayor_seleccion' %}?periodo_id={{ periodo.id }}" class="text-sic-teal hover:underline mt-4 inline-block no-print">
+        &larr; Volver al selector de reportes
+    </a>
+</div>
+
+<!-- Cuerpo del Reporte (Dos Columnas) -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+    
+    <!-- === COLUMNA IZQUIERDA: ACTIVOS === -->
+    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+        <table class="w-full">
+            <thead>
+                <tr class="bg-sic-dark-blue text-white">
+                    <th class="p-4 text-left text-lg font-bold" colspan="2">ACTIVOS</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for item in lista_activos %}
+                <tr>
+                    <td class="p-3 pl-6 text-gray-600">{{ item.cuenta.codigo }} - {{ item.cuenta.nombre }}</td>
+                    <td class="p-3 pr-6 text-right font-mono text-gray-800">${{ item.saldo|floatformat:2 }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td class="p-3 pl-6 text-gray-500" colspan="2">No hay activos registrados.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr class="bg-gray-100 border-t-4 border-sic-dark-blue">
+                    <td class="p-4 font-bold text-lg text-gray-800">TOTAL DE ACTIVOS</td>
+                    <td class="p-4 pr-6 text-right font-mono font-bold text-lg text-gray-900">${{ total_activos|floatformat:2 }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    <!-- === COLUMNA DERECHA: PASIVO Y PATRIMONIO === -->
+    <div class="space-y-8">
+        <!-- Bloque de Pasivos -->
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            <table class="w-full">
+                <thead>
+                    <tr class="bg-sic-medium-blue text-white">
+                        <th class="p-4 text-left text-lg font-bold" colspan="2">PASIVOS</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for item in lista_pasivos %}
+                    <tr>
+                        <td class="p-3 pl-6 text-gray-600">{{ item.cuenta.codigo }} - {{ item.cuenta.nombre }}</td>
+                        <td class="p-3 pr-6 text-right font-mono text-gray-800">${{ item.saldo|floatformat:2 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td class="p-3 pl-6 text-gray-500" colspan="2">No hay pasivos registrados.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="bg-gray-100 border-t-2 border-gray-300">
+                        <td class="p-3 font-semibold text-gray-800">Total de Pasivos</td>
+                        <td class="p-3 pr-6 text-right font-mono font-bold text-gray-900">${{ total_pasivos|floatformat:2 }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <!-- Bloque de Patrimonio -->
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            <table class="w-full">
+                <thead>
+                    <tr class="bg-sic-teal text-white">
+                        <th class="p-4 text-left text-lg font-bold" colspan="2">PATRIMONIO</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for item in lista_patrimonio %}
+                    <tr>
+                        <td class="p-3 pl-6 text-gray-600">{{ item.cuenta.codigo }} - {{ item.cuenta.nombre }}</td>
+                        <td class="p-3 pr-6 text-right font-mono text-gray-800">${{ item.saldo|floatformat:2 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td class="p-3 pl-6 text-gray-500" colspan="2">No hay patrimonio histórico registrado.</td>
+                    </tr>
+                    {% endfor %}
+                    <!-- Utilidad del Ejercicio -->
+                    <tr>
+                        <td class="p-3 pl-6 font-semibold {% if utilidad_ejercicio < 0 %}text-red-600{% else %}text-green-700{% endif %}">Utilidad (o Pérdida) del Ejercicio</td>
+                        <td class="p-3 pr-6 text-right font-mono font-semibold {% if utilidad_ejercicio < 0 %}text-red-600{% else %}text-green-700{% endif %}">
+                            {% if utilidad_ejercicio < 0 %}(${{ utilidad_ejercicio|floatformat:2|slice:"1:" }}){% else %}${{ utilidad_ejercicio|floatformat:2 }}{% endif %}
+                        </td>
+                    </tr>
+                </tbody>
+                <tfoot>
+                    <tr class="bg-gray-100 border-t-2 border-gray-300">
+                        <td class="p-3 font-semibold text-gray-800">Total de Patrimonio</td>
+                        <td class="p-3 pr-6 text-right font-mono font-bold text-gray-900">${{ total_patrimonio_final|floatformat:2 }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <!-- Total Pasivo + Patrimonio -->
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+             <table class="w-full">
+                <tfoot>
+                    <tr class="bg-gray-100 border-t-4 border-sic-dark-blue">
+                        <td class="p-4 font-bold text-lg text-gray-800">TOTAL PASIVO + PATRIMONIO</td>
+                        <td class="p-4 pr-6 text-right font-mono font-bold text-lg text-gray-900">${{ total_pasivo_patrimonio|floatformat:2 }}</td>
+                    </tr>
+                </tfoot>
+             </table>
+        </div>
+    </div>
+</div>
+
+<!-- Verificación de Cuadratura -->
+<div class="mt-8">
+    {% if esta_cuadrado %}
+        <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded-md shadow-md" role="alert">
+            <p class="font-bold">¡Balance Cuadrado!</p>
+            <p>Total Activos (${{ total_activos|floatformat:2 }}) es igual a Total Pasivo + Patrimonio (${{ total_pasivo_patrimonio|floatformat:2 }}).</p>
+        </div>
+    {% else %}
+        <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md shadow-md" role="alert">
+            <p class="font-bold">¡Error de Cuadratura!</p>
+            <p>Hay una diferencia de <span class="font-mono">${{ diferencia|floatformat:2 }}</span>. Revisa los asientos del período.</p>
+        </div>
+    {% endif %}
+</div>
+
+{% endblock %}

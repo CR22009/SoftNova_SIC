@@ -1,0 +1,30 @@
+<!-- 
+Este archivo parcial se llama a sí mismo para mostrar la jerarquía de cuentas.
+Recibe 'cuenta' y 'indent_level' del template padre.
+-->
+<tr class="{% if not cuenta.es_imputable %}bg-gray-50{% endif %}">
+    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium {% if cuenta.es_imputable %}text-gray-900{% else %}text-gray-500{% endif %}">
+        <span style="padding-left: {{ indent_level }}rem;">{{ cuenta.codigo }}</span>
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap text-sm {% if cuenta.es_imputable %}text-gray-900{% else %}text-gray-500{% endif %}">
+        <span class="font-semibold">{{ cuenta.nombre }}</span>
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ cuenta.get_tipo_cuenta_display }}</td>
+    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ cuenta.get_naturaleza_display }}</td>
+    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+        {% if cuenta.es_imputable %}
+            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                Sí
+            </span>
+        {% else %}
+            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                No (Grupo)
+            </span>
+        {% endif %}
+    </td>
+</tr>
+
+<!-- Recursión: Si la cuenta tiene hijos, llama a este mismo template para cada hijo -->
+{% for hijo in cuenta.hijos.all %}
+    {% include "contabilidad/partials/cuenta_fila.html" with cuenta=hijo indent_level=indent_level|add:2 %}
+{% endfor %}

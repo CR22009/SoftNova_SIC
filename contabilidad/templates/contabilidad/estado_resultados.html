@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+{% load humanize %} <!-- (No cargado, pero útil) Usaremos floatformat -->
+
+{% block title %}Estado de Resultados{% endblock %}
+{% block page_title %}Estado de Resultados{% endblock %}
+
+{% block header_action %}
+    <a href="javascript:window.print()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg shadow-md transition-colors duration-200 flex items-center space-x-2 no-print">
+        <ion-icon name="print-outline" class="text-xl"></ion-icon>
+        <span>Imprimir</span>
+    </a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Encabezado del Reporte -->
+<div class="bg-white p-6 rounded-lg shadow-md mb-6">
+    <div class="text-center">
+        <h2 class="text-2xl font-bold text-sic-dark-blue">SoftNova S.A. de C.V.</h2>
+        <h3 class="text-xl font-semibold text-gray-700">Estado de Resultados</h3>
+        <p class="text-lg text-gray-600">Del {{ periodo.fecha_inicio|date:"d \d\e F \d\e Y" }} al {{ periodo.fecha_fin|date:"d \d\e F \d\e Y" }}</p>
+        <p class="text-sm text-gray-500">(Valores expresados en Dólares de los Estados Unidos)</p>
+    </div>
+    <a href="{% url 'contabilidad:mayor_seleccion' %}?periodo_id={{ periodo.id }}" class="text-sic-teal hover:underline mt-4 inline-block no-print">
+        &larr; Volver al selector de reportes
+    </a>
+</div>
+
+<!-- Cuerpo del Reporte -->
+<div class="bg-white rounded-lg shadow-md overflow-hidden max-w-4xl mx-auto">
+    <table class="w-full">
+        <tbody class="divide-y divide-gray-200">
+            
+            <!-- === INGRESOS === -->
+            <tr class="bg-gray-50">
+                <td class="p-3 font-semibold text-gray-800" colspan="2">Ingresos Operativos</td>
+            </tr>
+            {% for item in lista_ingresos %}
+            <tr>
+                <td class="p-3 pl-8 text-gray-600">{{ item.cuenta.codigo }} - {{ item.cuenta.nombre }}</td>
+                <td class="p-3 text-right font-mono text-gray-800">${{ item.saldo|floatformat:2 }}</td>
+            </tr>
+            {% empty %}
+             <tr>
+                <td class="p-3 pl-8 text-gray-500" colspan="2">No hay ingresos registrados.</td>
+            </tr>
+            {% endfor %}
+            <tr class="bg-gray-100 border-t-2 border-gray-300">
+                <td class="p-3 font-semibold text-gray-800">Total de Ingresos</td>
+                <td class="p-3 text-right font-mono font-bold text-gray-900">${{ total_ingresos|floatformat:2 }}</td>
+            </tr>
+
+            <!-- === COSTOS === -->
+            <tr class="bg-gray-50">
+                <td class="p-3 font-semibold text-gray-800" colspan="2">Costos Operativos</td>
+            </tr>
+            {% for item in lista_costos %}
+            <tr>
+                <td class="p-3 pl-8 text-gray-600">{{ item.cuenta.codigo }} - {{ item.cuenta.nombre }}</td>
+                <td class="p-3 text-right font-mono text-gray-800">(${{ item.saldo|floatformat:2 }})</td>
+            </tr>
+            {% empty %}
+             <tr>
+                <td class="p-3 pl-8 text-gray-500" colspan="2">No hay costos registrados.</td>
+            </tr>
+            {% endfor %}
+            <tr class="bg-gray-100 border-t-2 border-gray-300">
+                <td class="p-3 font-semibold text-gray-800">Total de Costos</td>
+                <td class="p-3 text-right font-mono font-bold text-gray-900">(${{ total_costos|floatformat:2 }})</td>
+            </tr>
+
+            <!-- === UTILIDAD BRUTA === -->
+            <tr class="bg-sic-light-teal text-white">
+                <td class="p-4 font-bold text-lg">UTILIDAD BRUTA</td>
+                <td class="p-4 text-right font-mono font-bold text-lg">${{ utilidad_bruta|floatformat:2 }}</td>
+            </tr>
+
+            <!-- === GASTOS === -->
+            <tr class="bg-gray-50">
+                <td class="p-3 font-semibold text-gray-800" colspan="2">Gastos Operativos</td>
+            </tr>
+            {% for item in lista_gastos %}
+            <tr>
+                <td class="p-3 pl-8 text-gray-600">{{ item.cuenta.codigo }} - {{ item.cuenta.nombre }}</td>
+                <td class="p-3 text-right font-mono text-gray-800">(${{ item.saldo|floatformat:2 }})</td>
+            </tr>
+            {% empty %}
+             <tr>
+                <td class="p-3 pl-8 text-gray-500" colspan="2">No hay gastos registrados.</td>
+            </tr>
+            {% endfor %}
+            <tr class="bg-gray-100 border-t-2 border-gray-300">
+                <td class="p-3 font-semibold text-gray-800">Total de Gastos</td>
+                <td class="p-3 text-right font-mono font-bold text-gray-900">(${{ total_gastos|floatformat:2 }})</td>
+            </tr>
+
+            <!-- === UTILIDAD NETA === -->
+            <tr class="{% if utilidad_neta >= 0 %}bg-sic-dark-blue text-white{% else %}bg-red-700 text-white{% endif %}">
+                <td class="p-4 font-bold text-xl">UTILIDAD (O PÉRDIDA) DEL EJERCICIO</td>
+                <td class="p-4 text-right font-mono font-bold text-xl">
+                    {% if utilidad_neta < 0 %}(${{ utilidad_neta|floatformat:2|slice:"1:" }}){% else %}${{ utilidad_neta|floatformat:2 }}{% endif %}
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}

@@ -60,8 +60,8 @@
             
             <!-- Navegación Principal -->
             <nav class="flex-1 overflow-y-auto py-6">
-                <ul class="space-y-2">
-                    <!-- Dashboard (Ejemplo) -->
+                <ul class="space-y-1">
+                    <!-- Dashboard -->
                     <li>
                         <a href="{% url 'contabilidad:dashboard' %}" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
                             <ion-icon name="grid-outline" class="text-xl"></ion-icon>
@@ -69,49 +69,92 @@
                         </a>
                     </li>
                     
-                    <!-- MÓDULOS PRINCIPALES -->
-                    <li class="px-6 py-2 text-xs uppercase text-gray-400 font-semibold tracking-wider">Módulos</li>
-                    
-                    <!-- 1. Registro de Transacciones -->
+                    <!-- --- Grupo: Módulos --- -->
+                    <li class="px-6 pt-4 pb-2">
+                        <span class="text-xs uppercase text-gray-400 font-semibold tracking-wider">Módulos</span>
+                    </li>
                     <li>
                         <a href="{% url 'contabilidad:registrar_asiento' %}" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
                             <ion-icon name="create-outline" class="text-xl"></ion-icon>
-                            <span class="font-medium">Registro Transacciones</span>
+                            <span class="font-medium">Registro de Transacciones</span>
                         </a>
                     </li>
-                    
-                    <!-- 2. Mayorización (Cuentas T) -->
                     <li>
                         <a href="{% url 'contabilidad:mayor_seleccion' %}" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
                             <ion-icon name="book-outline" class="text-xl"></ion-icon>
                             <span class="font-medium">Libro Mayor</span>
                         </a>
                     </li>
-
-                    <!-- 3. Estados Financieros -->
                     <li>
-                        <a href="#" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
-                            <ion-icon name="document-text-outline" class="text-xl"></ion-icon>
-                            <span class="font-medium">Estados Financieros</span>
-                        </a>
-                    </li>
-
-                    <!-- 4. Costeo de Proyectos -->
-                    <li>
-                        <a href="#" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
+                        <a href="#" class="flex items-center space-x-3 px-6 py-3 text-gray-400 opacity-50 cursor-not-allowed" title="Próximamente">
                             <ion-icon name="calculator-outline" class="text-xl"></ion-icon>
-                            <span class="font-medium">Costeo de Proyectos</span>
+                            <span class="font-medium">Costeo de Software</span>
                         </a>
                     </li>
 
-                    <!-- Catálogo de Cuentas (Admin) -->
-                    <li class="px-6 pt-6 pb-2 text-xs uppercase text-gray-400 font-semibold tracking-wider">Configuración</li>
+                    <!-- --- Grupo: Estados Financieros --- -->
+                    <li class="px-6 pt-4 pb-2">
+                        <span class="text-xs uppercase text-gray-400 font-semibold tracking-wider">Estados Financieros</span>
+                    </li>
                     <li>
-                        <a href="#" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
-                            <ion-icon name="library-outline" class="text-xl"></ion-icon>
-                            <span class="font-medium">Catálogo de Cuentas</span>
+                        <a href="{% url 'contabilidad:mayor_seleccion' %}" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
+                            <ion-icon name="document-text-outline" class="text-xl"></ion-icon>
+                            <span class="font-medium">Estado de Resultados</span>
                         </a>
                     </li>
+                    <li>
+                        <a href="{% url 'contabilidad:mayor_seleccion' %}" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
+                            <ion-icon name="stats-chart-outline" class="text-xl"></ion-icon>
+                            <span class="font-medium">Balance General</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="flex items-center space-x-3 px-6 py-3 text-gray-400 opacity-50 cursor-not-allowed" title="Próximamente">
+                            <ion-icon name="cash-outline" class="text-xl"></ion-icon>
+                            <span class="font-medium">Flujo de Efectivo</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="flex items-center space-x-3 px-6 py-3 text-gray-400 opacity-50 cursor-not-allowed" title="Próximamente">
+                            <ion-icon name="trending-up-outline" class="text-xl"></ion-icon>
+                            <span class="font-medium">Estado de Patrimonio</span>
+                        </a>
+                    </li>
+
+                    <!-- --- Grupo: Configuración (con lógica de roles) --- -->
+                    <li class="px-6 pt-4 pb-2">
+                        <span class="text-xs uppercase text-gray-400 font-semibold tracking-wider">Configuración</span>
+                    </li>
+                    
+                    {% if user.is_superuser %}
+                        <!-- Vistas para ADMIN (Modificar) -->
+                        <li>
+                            <a href="{% url 'admin:contabilidad_cuenta_changelist' %}" target="_blank" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
+                                <ion-icon name="library-outline" class="text-xl"></ion-icon>
+                                <span class="font-medium">Catálogo de Cuentas</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{% url 'admin:contabilidad_periodocontable_changelist' %}" target="_blank" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
+                                <ion-icon name="calendar-outline" class="text-xl"></ion-icon>
+                                <span class="font-medium">Gestionar Períodos</span>
+                            </a>
+                        </li>
+                    {% else %}
+                        <!-- Vistas para CONTADOR (Solo Ver) -->
+                        <li>
+                            <a href="{% url 'contabilidad:ver_catalogo' %}" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
+                                <ion-icon name="library-outline" class="text-xl"></ion-icon>
+                                <span class="font-medium">Catálogo de Cuentas</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{% url 'contabilidad:ver_periodos' %}" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
+                                <ion-icon name="calendar-outline" class="text-xl"></ion-icon>
+                                <span class="font-medium">Gestionar Períodos</span>
+                            </a>
+                        </li>
+                    {% endif %}
                 </ul>
             </nav>
             
