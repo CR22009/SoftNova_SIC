@@ -105,7 +105,7 @@
         <h3 class="text-2xl font-bold text-center">
             Saldo Final ({{ cuenta.get_naturaleza_display }}):
             <!-- Usamos |abs para mostrar el valor siempre positivo en el saldo final -->
-            <span class="font-mono">${{ saldo|abs|floatformat:2 }}</span>
+            <span class="font-mono">${{ saldo_abs|floatformat:2 }}</span>
         </h3>
     </div>
 </div>

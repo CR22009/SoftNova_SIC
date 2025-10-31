@@ -69,7 +69,7 @@ def registrar_asiento(request):
     return render(request, 'contabilidad/registro_asiento.html', context)
 
 
-# --- NUEVO: FASE 2 - Vistas de Mayorización ---
+# --- FASE 2 - Vistas de Mayorización ---
 
 @login_required
 @user_passes_test(es_contador_o_admin, login_url='/admin/login/')
@@ -146,6 +146,7 @@ def libro_mayor_detalle(request, periodo_id, cuenta_id):
         'total_debe': total_debe,
         'total_haber': total_haber,
         'saldo': saldo,
+        'saldo_abs': abs(saldo),
     }
     return render(request, 'contabilidad/libro_mayor_detalle.html', context)
 
