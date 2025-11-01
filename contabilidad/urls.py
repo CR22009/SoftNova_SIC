@@ -16,10 +16,11 @@ urlpatterns = [
     path('reportes/balanza/<int:periodo_id>/', views.balanza_comprobacion, name='balanza_comprobacion'),
 
    # --- Estado de Resultados ---
-    path('estado-resultados/', views.hub_estado_resultados, name='hub_estado_resultados'), # NUEVO: Hub de selección
-    path('reportes/estado-resultados/<int:periodo_id>/', views.estado_resultados, name='estado_resultados'), # Página del reporte
+    path('estado-resultados/', views.hub_estado_resultados, name='hub_estado_resultados'), 
+    path('reportes/estado-resultados/<int:periodo_id>/', views.estado_resultados, name='estado_resultados'), 
     
     # --- Balance General ---
+    path('balance-general/', views.hub_balance_general, name='hub_balance_general'), 
     path('reportes/balance-general/<int:periodo_id>/', views.balance_general, name='balance_general'),
 
     # Configuración (Vistas Read-Only) ---
