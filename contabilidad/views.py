@@ -345,6 +345,31 @@ def balance_general(request, periodo_id):
 
 @login_required
 @user_passes_test(es_contador_o_admin, login_url='/admin/login/')
+def hub_estado_resultados(request):
+    """
+    Página de selección de período dedicada al Estado de Resultados.
+    """
+    if request.method == 'POST':
+        periodo_id = request.POST.get('periodo_id')
+        if periodo_id:
+            try:
+                # Validar que el período existe
+                periodo = PeriodoContable.objects.get(pk=periodo_id)
+                # Redirigir a la vista que genera el reporte
+                return redirect('contabilidad:estado_resultados', periodo_id=periodo.id)
+            except PeriodoContable.DoesNotExist:
+                messages.error(request, "Período no válido.")
+        else:
+            messages.error(request, "Debe seleccionar un período.")
+    
+    periodos = PeriodoContable.objects.all().order_by('-fecha_inicio')
+    context = {
+        'periodos': periodos
+    }
+    return render(request, 'contabilidad/hub_estado_resultados.html', context)
+
+@login_required
+@user_passes_test(es_contador_o_admin, login_url='/admin/login/')
 def ver_catalogo(request):
     """
     Vista de SOLO LECTURA del catálogo de cuentas para el rol 'Contador'.
