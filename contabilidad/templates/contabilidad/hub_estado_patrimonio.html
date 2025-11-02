@@ -1,17 +1,17 @@
 {% extends "base.html" %}
 
-{% block title %}Selección Flujo de Efectivo - SoftNova SIC{% endblock %}
+{% block title %}Selección Estado de Patrimonio - SoftNova SIC{% endblock %}
 
-{% block page_title %}Estado de Flujo de Efectivo{% endblock %}
+{% block page_title %}Estado de Cambios en el Patrimonio{% endblock %}
 
 {% block content %}
 <div class="p-6 md:p-10">
     
     <!-- Mensaje de bienvenida -->
     <div class="bg-white p-6 rounded-lg shadow-md mb-8">
-        <h2 class="text-2xl font-semibold text-sic-dark-blue mb-3">Generar Reporte de Flujo de Efectivo</h2>
+        <h2 class="text-2xl font-semibold text-sic-dark-blue mb-3">Generar Reporte de Cambios en el Patrimonio</h2>
         <p class="text-gray-600">
-            Por favor, seleccione el período contable para el cual desea generar el reporte. El sistema analizará las entradas y salidas de efectivo para ese período.
+            Por favor, seleccione el período contable para el cual desea generar el reporte. El sistema mostrará los saldos iniciales, movimientos y saldos finales de las cuentas de patrimonio.
         </p>
     </div>
 
@@ -19,7 +19,7 @@
     <div class="bg-white p-6 rounded-lg shadow-md">
         
         <!-- Formulario de Selección -->
-        <form method="POST" action="{% url 'contabilidad:hub_flujo_efectivo' %}" class="max-w-md mx-auto">
+        <form method="POST" action="{% url 'contabilidad:hub_estado_patrimonio' %}" class="max-w-md mx-auto">
             {% csrf_token %}
             
             <div class="mb-6">
@@ -39,7 +39,7 @@
 
             <!-- Botón de Envío -->
             <div class="text-center">
-                <button type-="submit" 
+                <button type="submit" 
                         class="w-full px-6 py-3 bg-sic-medium-blue text-white font-bold rounded-lg shadow-md hover:bg-sic-dark-blue focus:outline-none focus:ring-2 focus:ring-sic-dark-blue focus:ring-opacity-50 transition duration-300 ease-in-out transform hover:-translate-y-1"
                         {% if not periodos %}disabled{% endif %}>
                     Generar Reporte

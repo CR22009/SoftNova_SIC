@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Estado de Patrimonio - SoftNova SIC{% endblock %}
+
+{% block page_title %}Estado de Cambios en el Patrimonio{% endblock %}
+
+{% block content %}
+<div class="p-6 md:p-10 max-w-5xl mx-auto">
+
+    <!-- Encabezado del Reporte -->
+    <div class="bg-white p-6 rounded-lg shadow-md mb-8 border-t-4 border-sic-primary">
+        <div class="text-center">
+            <h2 class="text-2xl font-bold text-sic-darkest-blue">SoftNova S.A. de C.V.</h2>
+            <h3 class="text-xl font-semibold text-sic-dark-blue mt-1">Estado de Cambios en el Patrimonio</h3>
+            <p class="text-lg text-gray-600">Por el período del {{ periodo.fecha_inicio|date:"d \d\e F \d\e Y" }} al {{ periodo.fecha_fin|date:"d \d\e F \d\e Y" }}</p>
+            <p class="text-sm text-gray-500 mt-1">(Cifras expresadas en Dólares de Estados Unidos)</p>
+        </div>
+    </div>
+
+    <!-- Cuerpo del Reporte (Tabla) -->
+    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-max text-left">
+                <!-- Encabezados de la Tabla -->
+                <thead class="border-b bg-gray-50">
+                    <tr>
+                        <th class="p-4 text-sm font-semibold text-sic-dark-blue uppercase tracking-wider">Concepto de Patrimonio</th>
+                        <th class="p-4 text-sm font-semibold text-sic-dark-blue uppercase tracking-wider text-right">Saldo Inicial</th>
+                        <th class="p-4 text-sm font-semibold text-sic-dark-blue uppercase tracking-wider text-right">Movimientos del Período</th>
+                        <th class="p-4 text-sm font-semibold text-sic-dark-blue uppercase tracking-wider text-right">Saldo Final</th>
+                    </tr>
+                </thead>
+                
+                <!-- Cuerpo de la Tabla -->
+                <tbody class="divide-y divide-gray-200">
+                    <!-- Fila 1: Capital Social -->
+                    <tr class="hover:bg-gray-50">
+                        <td class="p-4 font-medium text-gray-800">Capital Social (Cta. 31)</td>
+                        <td class="p-4 text-gray-700 text-right font-mono">${{ reporte.capital_social.saldo_inicial|floatformat:2 }}</td>
+                        <td class="p-4 text-gray-700 text-right font-mono">${{ reporte.capital_social.movimientos|floatformat:2 }}</td>
+                        <td class="p-4 text-gray-700 text-right font-mono">${{ reporte.capital_social.saldo_final|floatformat:2 }}</td>
+                    </tr>
+                    
+                    <!-- Fila 2: Reserva Legal -->
+                    <tr class="hover:bg-gray-50">
+                        <td class="p-4 font-medium text-gray-800">Reserva Legal (Cta. 32)</td>
+                        <td class="p-4 text-gray-700 text-right font-mono">${{ reporte.reserva_legal.saldo_inicial|floatformat:2 }}</td>
+                        <td class="p-4 text-gray-700 text-right font-mono">${{ reporte.reserva_legal.movimientos|floatformat:2 }}</td>
+                        <td class="p-4 text-gray-700 text-right font-mono">${{ reporte.reserva_legal.saldo_final|floatformat:2 }}</td>
+                    </tr>
+                    
+                    <!-- Fila 3: Resultados Acumulados -->
+                    <tr class="hover:bg-gray-50">
+                        <td class="p-4 font-medium text-gray-800">Resultados Acumulados (Cta. 33)</td>
+                        <td class="p-4 text-gray-700 text-right font-mono">${{ reporte.resultados_acum.saldo_inicial|floatformat:2 }}</td>
+                        <td class="p-4 text-gray-700 text-right font-mono">${{ reporte.resultados_acum.movimientos|floatformat:2 }}</td>
+                        <td class="p-4 text-gray-700 text-right font-mono">${{ reporte.resultados_acum.saldo_final|floatformat:2 }}</td>
+                    </tr>
+                    
+                    <!-- Fila 4: Utilidad del Ejercicio -->
+                    <tr class="hover:bg-gray-50">
+                        <td class="p-4 font-medium text-gray-800">Utilidad (Pérdida) del Ejercicio</td>
+                        <td class="p-4 text-gray-700 text-right font-mono">${{ reporte.utilidad_ejercicio.saldo_inicial|floatformat:2 }}</td>
+                        <td class="p-4 text-gray-700 text-right font-mono {% if reporte.utilidad_ejercicio.movimientos < 0 %}text-red-600{% endif %}">
+                            {% if reporte.utilidad_ejercicio.movimientos < 0 %}
+                                (${{ reporte.utilidad_ejercicio.movimientos|floatformat:2|slice:"1:" }})
+                            {% else %}
+                                ${{ reporte.utilidad_ejercicio.movimientos|floatformat:2 }}
+                            {% endif %}
+                        </td>
+                        <td class="p-4 text-gray-700 text-right font-mono {% if reporte.utilidad_ejercicio.saldo_final < 0 %}text-red-600{% endif %}">
+                             {% if reporte.utilidad_ejercicio.saldo_final < 0 %}
+                                (${{ reporte.utilidad_ejercicio.saldo_final|floatformat:2|slice:"1:" }})
+                            {% else %}
+                                ${{ reporte.utilidad_ejercicio.saldo_final|floatformat:2 }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                </tbody>
+                
+                <!-- Pie de la Tabla (Totales) -->
+                <tfoot class="bg-gray-100 border-t-2 border-sic-primary">
+                    <tr>
+                        <td class="p-4 text-lg font-bold text-sic-darkest-blue">Total Patrimonio</td>
+                        <td class="p-4 text-lg font-bold text-sic-darkest-blue text-right font-mono">${{ totales.saldo_inicial|floatformat:2 }}</td>
+                        <td class="p-4 text-lg font-bold text-sic-darkest-blue text-right font-mono {% if totales.movimientos < 0 %}text-red-600{% else %}text-sic-darkest-blue{% endif %}">
+                            {% if totales.movimientos < 0 %}
+                                (${{ totales.movimientos|floatformat:2|slice:"1:" }})
+                            {% else %}
+                                ${{ totales.movimientos|floatformat:2 }}
+                            {% endif %}
+                        </td>
+                        <td class="p-4 text-lg font-bold text-sic-darkest-blue text-right font-mono {% if totales.saldo_final < 0 %}text-red-600{% else %}text-sic-darkest-blue{% endif %}">
+                            {% if totales.saldo_final < 0 %}
+                                (${{ totales.saldo_final|floatformat:2|slice:"1:" }})
+                            {% else %}
+                                ${{ totales.saldo_final|floatformat:2 }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

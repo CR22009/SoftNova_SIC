@@ -26,6 +26,10 @@ urlpatterns = [
     #--- Flujo de Efectivo ---
     path('flujo-efectivo/', views.hub_flujo_efectivo, name='hub_flujo_efectivo'),
     path('reportes/flujo-efectivo/<int:periodo_id>/', views.flujo_efectivo, name='flujo_efectivo'),
+    
+    #--- Estado de Patrimonio ---
+    path('estado-patrimonio/', views.hub_estado_patrimonio, name='hub_estado_patrimonio'),
+    path('reportes/estado-patrimonio/<int:periodo_id>/', views.estado_patrimonio, name='estado_patrimonio'),
 
     # Configuración (Vistas Read-Only) ---
     path('configuracion/catalogo/', views.ver_catalogo, name='ver_catalogo'),

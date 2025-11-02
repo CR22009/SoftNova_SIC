@@ -442,9 +442,7 @@ def flujo_efectivo(request, periodo_id):
         # El saldo de la contrapartida (Debe - Haber)
         saldo_contrapartida = (item['total_debe'] or 0) - (item['total_haber'] or 0)
         # El flujo de efectivo es el INVERSO del saldo de la contrapartida
-        # Ej: Si 'Clientes' (Debe) aumenta $100, 'Efectivo' (Haber) disminuye $100 (Flujo Negativo)
-        #     Pero aquí estamos viendo el movimiento. Si 'Clientes' (Debe) $100 y 'Efectivo' (Debe) $100 no tiene sentido.
-        #     Si 'Ventas' (Haber) $100, 'Efectivo' (Debe) $100 -> Saldo Contrapartida (Ventas) = -100. Flujo = +100. (Correcto)
+        # Ej: Si 'Ventas' (Haber) $100, 'Efectivo' (Debe) $100 -> Saldo Contrapartida (Ventas) = -100. Flujo = +100. (Correcto)
         #     Si 'Gastos' (Debe) $50, 'Efectivo' (Haber) $50 -> Saldo Contrapartida (Gastos) = +50. Flujo = -50. (Correcto)
         flujo = -saldo_contrapartida
         
@@ -553,3 +551,58 @@ def ver_periodos(request):
     }
     return render(request, 'contabilidad/periodos_readonly.html', context)
 
+# --- ======================================================= ---
+# ---     NUEVO: FASE 3 - Estado de Cambios en el Patrimonio ---
+# --- ======================================================= ---
+
+@login_required
+@user_passes_test(es_contador_o_admin, login_url='/admin/login/')
+def hub_estado_patrimonio(request):
+    """Hub de selección para Estado de Cambios en el Patrimonio."""
+    if request.method == 'POST':
+        periodo_id = request.POST.get('periodo_id')
+        if periodo_id:
+            try:
+                periodo = PeriodoContable.objects.get(pk=periodo_id)
+                return redirect('contabilidad:estado_patrimonio', periodo_id=periodo.id)
+            except PeriodoContable.DoesNotExist:
+                messages.error(request, "Período no válido.")
+        else:
+            messages.error(request, "Debe seleccionar un período.")
+    
+    periodos = PeriodoContable.objects.all().order_by('-fecha_inicio')
+    context = {
+        'periodos': periodos
+    }
+    return render(request, 'contabilidad/hub_estado_patrimonio.html', context)
+
+@login_required
+@user_passes_test(es_contador_o_admin, login_url='/admin/login/')
+def estado_patrimonio(request, periodo_id):
+    """
+    Muestra el reporte de Estado de Cambios en el Patrimonio.
+    (Versión simplificada consistente con otros reportes).
+    """
+    periodo = get_object_or_404(PeriodoContable, pk=periodo_id)
+    
+    # 1. Reutilizamos la lógica del Balance General
+    # Esto nos da los saldos del período para Capital, Reservas, etc.
+    lista_patrimonio, total_patrimonio_historico = _calcular_saldos_cuentas_por_tipo(periodo, Cuenta.TipoCuenta.PATRIMONIO)
+    
+    # 2. Reutilizamos la lógica del Estado de Resultados
+    utilidad_ejercicio = _get_utilidad_del_ejercicio(periodo)
+    
+    # 3. Calculamos el total
+    total_patrimonio_final = total_patrimonio_historico + utilidad_ejercicio
+
+    context = {
+        'periodo': periodo,
+        'lista_patrimonio': lista_patrimonio, # Ej. [{'cuenta': <Cta 31>, 'saldo': 50000}, ...]
+        'total_patrimonio_historico': total_patrimonio_historico,
+        'utilidad_ejercicio': utilidad_ejercicio,
+        'total_patrimonio_final': total_patrimonio_final,
+    }
+    # Nota: Tu plantilla 'estado_patrimonio.html' debe ser adaptada
+    # para iterar sobre 'lista_patrimonio' y mostrar la 'utilidad_ejercicio'
+    # como una línea separada.
+    return render(request, 'contabilidad/estado_patrimonio.html', context)
