@@ -1,12 +1,11 @@
+{% load auth_extras %} <!-- Carga nuestro filtro de roles personalizado -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Título dinámico para cada página -->
     <title>{% block title %}SoftNova SIC{% endblock %}</title>
     
-    <!-- Carga de Tailwind CSS (vía CDN para desarrollo rápido) -->
     <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- Configuración personalizada de Tailwind -->
@@ -18,31 +17,22 @@
               // Paleta de colores personalizada para SoftNova_SIC
               'sic-dark-blue': '#000B58',
               'sic-medium-blue': '#003161',
-              'sic-teal': '#006A67',
-              'sic-light-teal': '#3B9797',
+              'sic-teal': '#006A67', // sic-primary
+              'sic-light-teal': '#3B9797', // sic-secondary
             }
           }
         }
       }
     </script>
 
-    <!-- Iconos (usaremos Heroicons, muy popular con Tailwind) -->
     <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
     <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
 
     <style>
-      /* Estilo para la barra de scroll (opcional pero elegante) */
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #006A67; /* sic-teal */
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #f1f1f1;
-      }
+      /* Estilo para la barra de scroll */
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-thumb { background: #006A67; border-radius: 4px; }
+      ::-webkit-scrollbar-track { background: #f1f1f1; }
     </style>
 </head>
 <body class="bg-gray-100 font-sans antialiased">
@@ -50,18 +40,15 @@
     <div class="flex h-screen">
         
         <!-- === Sidebar (Menú Lateral) === -->
-        <!-- Aplicamos tus colores: fondo oscuro, acentos en teal -->
         <aside class="w-64 bg-sic-dark-blue text-white flex flex-col fixed h-full shadow-lg">
             
-            <!-- Logo/Encabezado del Sidebar -->
             <div class="h-20 flex items-center justify-center bg-sic-medium-blue shadow-md">
                 <h1 class="text-2xl font-bold tracking-wider">SoftNova SIC</h1>
             </div>
             
-            <!-- Navegación Principal -->
             <nav class="flex-1 overflow-y-auto py-6">
                 <ul class="space-y-1">
-                    <!-- Dashboard -->
+                    <!-- Dashboard (Todos los roles) -->
                     <li>
                         <a href="{% url 'contabilidad:dashboard' %}" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
                             <ion-icon name="grid-outline" class="text-xl"></ion-icon>
@@ -73,6 +60,9 @@
                     <li class="px-6 pt-4 pb-2">
                         <span class="text-xs uppercase text-gray-400 font-semibold tracking-wider">Módulos</span>
                     </li>
+                    
+                    <!-- Administrador y Contador -->
+                    {% if user|has_group:"Administrador" or user|has_group:"Contador" %}
                     <li>
                         <a href="{% url 'contabilidad:registrar_asiento' %}" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
                             <ion-icon name="create-outline" class="text-xl"></ion-icon>
@@ -85,14 +75,21 @@
                             <span class="font-medium">Libro Mayor</span>
                         </a>
                     </li>
+                    {% endif %}
+
+                    <!-- Administrador e Informático -->
+                    {% if user|has_group:"Administrador" or user|has_group:"Informático" %}
                     <li>
                         <a href="#" class="flex items-center space-x-3 px-6 py-3 text-gray-400 opacity-50 cursor-not-allowed" title="Próximamente">
                             <ion-icon name="calculator-outline" class="text-xl"></ion-icon>
                             <span class="font-medium">Costeo de Software</span>
                         </a>
                     </li>
+                    {% endif %}
 
                     <!-- --- Grupo: Estados Financieros --- -->
+                    <!-- Administrador y Contador -->
+                    {% if user|has_group:"Administrador" or user|has_group:"Contador" %}
                     <li class="px-6 pt-4 pb-2">
                         <span class="text-xs uppercase text-gray-400 font-semibold tracking-wider">Estados Financieros</span>
                     </li>
@@ -120,54 +117,60 @@
                             <span class="font-medium">Estado de Patrimonio</span>
                         </a>
                     </li>
+                    {% endif %}
 
                     <!-- --- Grupo: Configuración (con lógica de roles) --- -->
+                    <!-- Administrador y Contador (ven cosas diferentes) -->
+                    {% if user|has_group:"Administrador" or user|has_group:"Contador" %}
                     <li class="px-6 pt-4 pb-2">
                         <span class="text-xs uppercase text-gray-400 font-semibold tracking-wider">Configuración</span>
                     </li>
                     
-                    {% if user.is_superuser %}
-                        <!-- Vistas para ADMIN (Modificar) -->
-                        <li>
-                            <a href="{% url 'admin:contabilidad_cuenta_changelist' %}" target="_blank" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
-                                <ion-icon name="library-outline" class="text-xl"></ion-icon>
-                                <span class="font-medium">Catálogo de Cuentas</span>
-                            </a>
-                        </li>
-                        <li>
-                            <a href="{% url 'admin:contabilidad_periodocontable_changelist' %}" target="_blank" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
-                                <ion-icon name="calendar-outline" class="text-xl"></ion-icon>
-                                <span class="font-medium">Gestionar Períodos</span>
-                            </a>
-                        </li>
-                    {% else %}
-                        <!-- Vistas para CONTADOR (Solo Ver) -->
-                        <li>
-                            <a href="{% url 'contabilidad:ver_catalogo' %}" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
-                                <ion-icon name="library-outline" class="text-xl"></ion-icon>
-                                <span class="font-medium">Catálogo de Cuentas</span>
-                            </a>
-                        </li>
-                        <li>
-                            <a href="{% url 'contabilidad:ver_periodos' %}" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
-                                <ion-icon name="calendar-outline" class="text-xl"></ion-icon>
-                                <span class="font-medium">Gestionar Períodos</span>
-                            </a>
-                        </li>
+                        {% if user|has_group:"Administrador" %}
+                            <!-- Vistas para ADMIN (Modificar) -->
+                            <li>
+                                <a href="{% url 'admin:contabilidad_cuenta_changelist' %}" target="_blank" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
+                                    <ion-icon name="library-outline" class="text-xl"></ion-icon>
+                                    <span class="font-medium">Catálogo de Cuentas</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{% url 'admin:contabilidad_periodocontable_changelist' %}" target="_blank" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
+                                    <ion-icon name="calendar-outline" class="text-xl"></ion-icon>
+                                    <span class="font-medium">Gestionar Períodos</span>
+                                </a>
+                            </li>
+                        {% elif user|has_group:"Contador" %}
+                            <!-- Vistas para CONTADOR (Solo Ver) -->
+                            <li>
+                                <a href="{% url 'contabilidad:ver_catalogo' %}" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
+                                    <ion-icon name="library-outline" class="text-xl"></ion-icon>
+                                    <span class="font-medium">Catálogo de Cuentas</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{% url 'contabilidad:ver_periodos' %}" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
+                                    <ion-icon name="calendar-outline" class="text-xl"></ion-icon>
+                                    <span class="font-medium">Gestionar Períodos</span>
+                                </a>
+                            </li>
+                        {% endif %}
                     {% endif %}
                 </ul>
             </nav>
             
             <!-- Footer del Sidebar (Usuario, Salir) -->
             <div class="h-16 p-4 flex items-center justify-between bg-sic-medium-blue shadow-inner">
-                <div class="flex items-center space-x-2">
-                    <ion-icon name="person-circle-outline" class="text-3xl text-sic-light-teal"></ion-icon>
-                    <div>
-                        <span class="text-sm font-medium">{% if user.is_authenticated %}{{ user.username }}{% else %}Usuario{% endif %}</span>
-                        <span class="text-xs text-gray-400">{% if user.is_staff %}Admin/Contador{% endif %}</span>
+                <div class="flex items-center space-x-2 truncate">
+                    <ion-icon name="person-circle-outline" class="text-3xl text-sic-light-teal flex-shrink-0"></ion-icon>
+                    <div class="truncate">
+                        <span classs="text-sm font-medium truncate">{% if user.is_authenticated %}{{ user.username }}{% else %}Usuario{% endif %}</span>
+                        <!-- Muestra el primer grupo al que pertenece -->
+                        <span class="text-xs text-gray-400 block truncate">{% if user.groups.all.0 %}{{ user.groups.all.0.name }}{% endif %}</span>
                     </div>
                 </div>
-                <a href="#" title="Cerrar Sesión">
+                <!-- Botón de Cerrar Sesión -->
+                <a href="{% url 'contabilidad:logout' %}" title="Cerrar Sesión">
                     <ion-icon name="log-out-outline" class="text-2xl text-gray-400 hover:text-white"></ion-icon>
                 </a>
             </div>
@@ -179,20 +182,37 @@
             <!-- Header Superior -->
             <header class="h-20 bg-white shadow-sm flex items-center justify-between px-8 border-b border-gray-200">
                 <div>
-                    <!-- Título de la página actual -->
                     <h2 class="text-2xl font-semibold text-gray-800">
                         {% block page_title %}Dashboard{% endblock %}
                     </h2>
                 </div>
                 <div>
-                    <!-- Acciones rápidas, ej. Nuevo Asiento -->
-                    <button class="bg-sic-teal hover:bg-sic-light-teal text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-colors duration-200 flex items-center space-x-2">
+                    <!-- Acciones rápidas (Solo para Admin/Contador) -->
+                    {% if user|has_group:"Administrador" or user|has_group:"Contador" %}
+                    <a href="{% url 'contabilidad:registrar_asiento' %}" class="bg-sic-teal hover:bg-sic-light-teal text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-colors duration-200 flex items-center space-x-2">
                         <ion-icon name="add-outline" class="text-xl"></ion-icon>
                         <span>Nuevo Asiento</span>
-                    </button>
+                    </a>
+                    {% endif %}
                 </div>
             </header>
             
+            <!-- Mensajes del Sistema (Django Messages Framework) -->
+            {% if messages %}
+                <div class="px-8 pt-4">
+                {% for message in messages %}
+                    <div class="relative px-4 py-3 rounded-lg shadow-md 
+                        {% if message.tags == 'success' %} bg-green-100 border border-green-400 text-green-700 
+                        {% elif message.tags == 'error' %} bg-red-100 border border-red-400 text-red-700 
+                        {% else %} bg-blue-100 border border-blue-400 text-blue-700 
+                        {% endif %}"
+                         role="alert">
+                        <span class="block sm:inline">{{ message }}</span>
+                    </div>
+                {% endfor %}
+                </div>
+            {% endif %}
+
             <!-- Contenido Específico de la Página -->
             <div class="p-8">
                 {% block content %}
@@ -201,7 +221,7 @@
                     <h3 class="text-lg font-semibold text-gray-700">Bienvenido al Sistema de Contabilidad</h3>
                     <p class="text-gray-600 mt-2">
                         Este es el área de contenido principal. Selecciona un módulo del menú lateral para comenzar.
-                    </p>
+                    </D>
                 </div>
                 {% endblock %}
             </div>
@@ -211,3 +231,4 @@
 
 </body>
 </html>
+

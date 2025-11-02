@@ -3,16 +3,87 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db import transaction, models
 from django.db.models import Sum, Q # Importar Q
 from django.contrib import messages
+# --- Imports para Login ---
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.forms import AuthenticationForm
+# --- Fin Imports Login ---
 from .models import AsientoDiario, PeriodoContable, Cuenta, Movimiento
 from .forms import AsientoDiarioForm, MovimientoFormSet
 from decimal import Decimal
 
-# --- Verificación de Roles ---
-def es_contador_o_admin(user):
-    """Verifica si el usuario es staff (Contador) o superuser (Admin)."""
-    return user.is_staff or user.is_superuser
+# --- ========================================= ---
+# ---     AUTENTICACIÓN Y ROLES (NUEVO)         ---
+# --- ========================================= ---
 
-# --- Dashboard ---
+def login_view(request):
+    """
+    Maneja el inicio de sesión personalizado.
+    """
+    # Si el usuario ya está autenticado, redirigir al dashboard
+    if request.user.is_authenticated:
+        return redirect('contabilidad:dashboard')
+    
+    if request.method == 'POST':
+        form = AuthenticationForm(request, data=request.POST)
+        if form.is_valid():
+            username = form.cleaned_data.get('username')
+            password = form.cleaned_data.get('password')
+            user = authenticate(username=username, password=password)
+            
+            if user is not None:
+                login(request, user)
+                messages.success(request, f"Bienvenido de nuevo, {user.first_name or user.username}.")
+                # Redirigir al dashboard después de un login exitoso
+                return redirect('contabilidad:dashboard')
+            else:
+                messages.error(request, "Usuario o contraseña incorrectos. Inténtalo de nuevo.")
+        else:
+            messages.error(request, "Usuario o contraseña incorrectos. Inténtalo de nuevo.")
+    else:
+        form = AuthenticationForm()
+        
+    # Renderizar la plantilla de login personalizada
+    # (La crearemos en el siguiente paso)
+    return render(request, 'contabilidad/login.html', {'form': form})
+
+def logout_view(request):
+    """
+    Cierra la sesión del usuario.
+    """
+    logout(request)
+    messages.info(request, "Has cerrado sesión exitosamente.")
+    # Redirigir a la página de login
+    return redirect('contabilidad:login')
+
+
+# --- Verificación de Roles (NUEVO) ---
+def es_grupo_administrador(user):
+    """Verifica si el usuario pertenece al grupo 'Administrador'."""
+    return user.groups.filter(name='Administrador').exists()
+
+def es_grupo_contador(user):
+    """Verifica si el usuario pertenece al grupo 'Contador'."""
+    return user.groups.filter(name='Contador').exists()
+
+def es_grupo_informatico(user):
+    """Verifica si el usuario pertenece al grupo 'Informático'."""
+    return user.groups.filter(name='Informático').exists()
+
+# Comprobador para vistas contables (Acceso para Admin Y Contador)
+def check_acceso_contable(user):
+    """Verifica si el usuario tiene rol de Administrador o Contador."""
+    return user.is_authenticated and (es_grupo_administrador(user) or es_grupo_contador(user))
+
+# Comprobador para vistas de costeo (Acceso para Admin E Informático)
+def check_acceso_costeo(user):
+    """Verifica si el usuario tiene rol de Administrador o Informático."""
+    # (Lo usaremos cuando implementemos el módulo de costeo)
+    return user.is_authenticated and (es_grupo_administrador(user) or es_grupo_informatico(user))
+
+
+# --- ========================================= ---
+# ---     Dashboard (Sin cambios, solo @login_required) ---
+# --- ========================================= ---
 @login_required
 def dashboard(request):
     """Página principal del sistema."""
@@ -29,7 +100,7 @@ def dashboard(request):
 # --- ========================================= ---
 
 @login_required
-@user_passes_test(es_contador_o_admin, login_url='/admin/login/')
+@user_passes_test(check_acceso_contable) # <-- DECORADOR ACTUALIZADO
 @transaction.atomic
 def registrar_asiento(request):
     """Maneja el formulario de registro de asientos diarios con formsets."""
@@ -87,7 +158,7 @@ def registrar_asiento(request):
 # --- ========================================= ---
 
 @login_required
-@user_passes_test(es_contador_o_admin, login_url='/admin/login/')
+@user_passes_test(check_acceso_contable) # <-- DECORADOR ACTUALIZADO
 def mayor_seleccion(request):
     """Hub de selección para Libro Mayor y Balanza de Comprobación."""
     periodos = PeriodoContable.objects.all().order_by('-fecha_inicio')
@@ -117,7 +188,7 @@ def mayor_seleccion(request):
     return render(request, 'contabilidad/mayor_seleccion.html', context)
 
 @login_required
-@user_passes_test(es_contador_o_admin, login_url='/admin/login/')
+@user_passes_test(check_acceso_contable) # <-- DECORADOR ACTUALIZADO
 def libro_mayor_detalle(request, periodo_id, cuenta_id):
     """Muestra el detalle de una Cuenta T para un período."""
     periodo = get_object_or_404(PeriodoContable, pk=periodo_id)
@@ -160,7 +231,7 @@ def libro_mayor_detalle(request, periodo_id, cuenta_id):
     return render(request, 'contabilidad/libro_mayor_detalle.html', context)
 
 @login_required
-@user_passes_test(es_contador_o_admin, login_url='/admin/login/')
+@user_passes_test(check_acceso_contable) # <-- DECORADOR ACTUALIZADO
 def balanza_comprobacion(request, periodo_id):
     """Muestra la Balanza de Comprobación para un período."""
     periodo = get_object_or_404(PeriodoContable, pk=periodo_id)
@@ -257,7 +328,7 @@ def _get_utilidad_del_ejercicio(periodo):
     utilidad = total_ingresos - (total_costos + total_gastos)
     return utilidad
 
-# --- NUEVO: Helper para Flujo de Efectivo ---
+# --- Helper para Flujo de Efectivo ---
 def _get_saldo_cuentas(cuentas_ids, periodo):
     """
     Calcula el saldo acumulado de un conjunto de cuentas HASTA el final
@@ -283,7 +354,7 @@ def _get_saldo_cuentas(cuentas_ids, periodo):
 
 # --- Estado de Resultados ---
 @login_required
-@user_passes_test(es_contador_o_admin, login_url='/admin/login/')
+@user_passes_test(check_acceso_contable) # <-- DECORADOR ACTUALIZADO
 def estado_resultados(request, periodo_id):
     """Muestra el reporte de Estado de Resultados."""
     periodo = get_object_or_404(PeriodoContable, pk=periodo_id)
@@ -309,7 +380,7 @@ def estado_resultados(request, periodo_id):
     return render(request, 'contabilidad/estado_resultados.html', context)
 
 @login_required
-@user_passes_test(es_contador_o_admin, login_url='/admin/login/')
+@user_passes_test(check_acceso_contable) # <-- DECORADOR ACTUALIZADO
 def hub_estado_resultados(request):
     """Hub de selección para Estado de Resultados."""
     if request.method == 'POST':
@@ -331,7 +402,7 @@ def hub_estado_resultados(request):
 
 # --- Balance General ---
 @login_required
-@user_passes_test(es_contador_o_admin, login_url='/admin/login/')
+@user_passes_test(check_acceso_contable) # <-- DECORADOR ACTUALIZADO
 def balance_general(request, periodo_id):
     """Muestra el reporte de Balance General."""
     periodo = get_object_or_404(PeriodoContable, pk=periodo_id)
@@ -364,7 +435,7 @@ def balance_general(request, periodo_id):
     return render(request, 'contabilidad/balance_general.html', context)
 
 @login_required
-@user_passes_test(es_contador_o_admin, login_url='/admin/login/')
+@user_passes_test(check_acceso_contable) # <-- DECORADOR ACTUALIZADO
 def hub_balance_general(request):
     """Hub de selección para Balance General."""
     if request.method == 'POST':
@@ -385,9 +456,9 @@ def hub_balance_general(request):
     return render(request, 'contabilidad/hub_balance_general.html', context)
 
 
-# --- NUEVO: Flujo de Efectivo ---
+# --- Flujo de Efectivo ---
 @login_required
-@user_passes_test(es_contador_o_admin, login_url='/admin/login/')
+@user_passes_test(check_acceso_contable) # <-- DECORADOR ACTUALIZADO
 def flujo_efectivo(request, periodo_id):
     """
     Muestra el reporte de Flujo de Efectivo (Método Directo Simplificado)
@@ -442,8 +513,6 @@ def flujo_efectivo(request, periodo_id):
         # El saldo de la contrapartida (Debe - Haber)
         saldo_contrapartida = (item['total_debe'] or 0) - (item['total_haber'] or 0)
         # El flujo de efectivo es el INVERSO del saldo de la contrapartida
-        # Ej: Si 'Ventas' (Haber) $100, 'Efectivo' (Debe) $100 -> Saldo Contrapartida (Ventas) = -100. Flujo = +100. (Correcto)
-        #     Si 'Gastos' (Debe) $50, 'Efectivo' (Haber) $50 -> Saldo Contrapartida (Gastos) = +50. Flujo = -50. (Correcto)
         flujo = -saldo_contrapartida
         
         flujo_item = {'nombre': nombre, 'monto': flujo}
@@ -468,14 +537,10 @@ def flujo_efectivo(request, periodo_id):
             flujos_financiacion.append(flujo_item)
             total_financiacion += flujo
         
-        # (Se omiten Depreciaciones/Amortizaciones '154','163','526' 
-        # porque no mueven efectivo y no deberían estar en 'contrapartidas')
-
     # 6. Verificación final
     total_flujo_neto = total_operacion + total_inversion + total_financiacion
     flujo_calculado = saldo_inicial_efectivo + total_flujo_neto
     
-    # Comprobar si el flujo calculado coincide con el saldo final real
     esta_cuadrado = flujo_calculado.quantize(Decimal('0.01')) == saldo_final_efectivo.quantize(Decimal('0.01'))
     diferencia = saldo_final_efectivo - flujo_calculado
 
@@ -502,7 +567,7 @@ def flujo_efectivo(request, periodo_id):
 
 
 @login_required
-@user_passes_test(es_contador_o_admin, login_url='/admin/login/')
+@user_passes_test(check_acceso_contable) # <-- DECORADOR ACTUALIZADO
 def hub_flujo_efectivo(request):
     """
     Página de selección de período dedicada al Flujo de Efectivo.
@@ -525,38 +590,9 @@ def hub_flujo_efectivo(request):
     return render(request, 'contabilidad/hub_flujo_efectivo.html', context)
 
 
-# --- ========================================= ---
-# ---     Vistas de Configuración (Read-Only) ---
-# --- ========================================= ---
-
+# --- Estado de Patrimonio ---
 @login_required
-@user_passes_test(es_contador_o_admin, login_url='/admin/login/')
-def ver_catalogo(request):
-    """Muestra el Catálogo de Cuentas (Solo Lectura)."""
-    # Obtenemos solo las cuentas de nivel superior (padre=None)
-    # El template se encargará de mostrar los hijos recursivamente
-    cuentas_principales = Cuenta.objects.filter(padre__isnull=True).order_by('codigo')
-    context = {
-        'cuentas_principales': cuentas_principales,
-    }
-    return render(request, 'contabilidad/catalogo_readonly.html', context)
-
-@login_required
-@user_passes_test(es_contador_o_admin, login_url='/admin/login/')
-def ver_periodos(request):
-    """Muestra los Períodos Contables (Solo Lectura)."""
-    periodos = PeriodoContable.objects.all().order_by('-fecha_inicio')
-    context = {
-        'periodos': periodos,
-    }
-    return render(request, 'contabilidad/periodos_readonly.html', context)
-
-# --- ======================================================= ---
-# ---     NUEVO: FASE 3 - Estado de Cambios en el Patrimonio ---
-# --- ======================================================= ---
-
-@login_required
-@user_passes_test(es_contador_o_admin, login_url='/admin/login/')
+@user_passes_test(check_acceso_contable) # <-- DECORADOR ACTUALIZADO
 def hub_estado_patrimonio(request):
     """Hub de selección para Estado de Cambios en el Patrimonio."""
     if request.method == 'POST':
@@ -577,7 +613,7 @@ def hub_estado_patrimonio(request):
     return render(request, 'contabilidad/hub_estado_patrimonio.html', context)
 
 @login_required
-@user_passes_test(es_contador_o_admin, login_url='/admin/login/')
+@user_passes_test(check_acceso_contable) # <-- DECORADOR ACTUALIZADO
 def estado_patrimonio(request, periodo_id):
     """
     Muestra el reporte de Estado de Cambios en el Patrimonio.
@@ -586,7 +622,6 @@ def estado_patrimonio(request, periodo_id):
     periodo = get_object_or_404(PeriodoContable, pk=periodo_id)
     
     # 1. Reutilizamos la lógica del Balance General
-    # Esto nos da los saldos del período para Capital, Reservas, etc.
     lista_patrimonio, total_patrimonio_historico = _calcular_saldos_cuentas_por_tipo(periodo, Cuenta.TipoCuenta.PATRIMONIO)
     
     # 2. Reutilizamos la lógica del Estado de Resultados
@@ -602,7 +637,29 @@ def estado_patrimonio(request, periodo_id):
         'utilidad_ejercicio': utilidad_ejercicio,
         'total_patrimonio_final': total_patrimonio_final,
     }
-    # Nota: Tu plantilla 'estado_patrimonio.html' debe ser adaptada
-    # para iterar sobre 'lista_patrimonio' y mostrar la 'utilidad_ejercicio'
-    # como una línea separada.
     return render(request, 'contabilidad/estado_patrimonio.html', context)
+
+# --- ========================================= ---
+# ---     Vistas de Configuración (Read-Only) ---
+# --- ========================================= ---
+
+@login_required
+@user_passes_test(check_acceso_contable) # <-- DECORADOR ACTUALIZADO
+def ver_catalogo(request):
+    """Muestra el Catálogo de Cuentas (Solo Lectura)."""
+    cuentas_principales = Cuenta.objects.filter(padre__isnull=True).order_by('codigo')
+    context = {
+        'cuentas_principales': cuentas_principales,
+    }
+    return render(request, 'contabilidad/catalogo_readonly.html', context)
+
+@login_required
+@user_passes_test(check_acceso_contable) # <-- DECORADOR ACTUALIZADO
+def ver_periodos(request):
+    """Muestra los Períodos Contables (Solo Lectura)."""
+    periodos = PeriodoContable.objects.all().order_by('-fecha_inicio')
+    context = {
+        'periodos': periodos,
+    }
+    return render(request, 'contabilidad/periodos_readonly.html', context)
+

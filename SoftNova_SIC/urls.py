@@ -10,6 +10,7 @@ urlpatterns = [
     path('contabilidad/', include('contabilidad.urls')),
     
     # Redirección de la raíz (http://.../)
-    # al dashboard de contabilidad
-    path('', RedirectView.as_view(url='/contabilidad/', permanent=True)),
+    # AHORA apunta a nuestra vista de login
+    path('', RedirectView.as_view(url='/contabilidad/login/', permanent=True)),
 ]
+

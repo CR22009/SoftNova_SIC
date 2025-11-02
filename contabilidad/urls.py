@@ -4,6 +4,10 @@ from . import views
 app_name = 'contabilidad'  # Namespace para las URLs
 
 urlpatterns = [
+    # --- Autenticación (NUEVO) ---
+    path('login/', views.login_view, name='login'),
+    path('logout/', views.logout_view, name='logout'),
+
     # Dashboard
     path('', views.dashboard, name='dashboard'),
     
@@ -35,3 +39,4 @@ urlpatterns = [
     path('configuracion/catalogo/', views.ver_catalogo, name='ver_catalogo'),
     path('configuracion/periodos/', views.ver_periodos, name='ver_periodos'),
 ]
+

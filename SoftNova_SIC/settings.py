@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'contabilidad',
     
+    # 'contabilidad.templatetags.auth_extras', <-- ESTA LÍNEA SE ELIMINÓ (CAUSA DEL ERROR)
 ]
 
 MIDDLEWARE = [
@@ -64,6 +65,8 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
             ],
+            # La sección 'builtins' también se eliminó
+            # ya que causa el mismo error de AppRegistryNotReady
         },
     },
 ]
@@ -104,9 +107,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
-
-TIME_ZONE = 'UTC'
+# --- MODIFICADO: Para que coincida con tu ubicación ---
+LANGUAGE_CODE = 'es-sv'
+TIME_ZONE = 'America/El_Salvador'
 
 USE_I18N = True
 
@@ -122,3 +125,16 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# --- NUEVO: Configuraciones de Autenticación Personalizada ---
+
+# A dónde redirigir si el usuario NO está logueado e intenta acceder a una página protegida
+LOGIN_URL = 'contabilidad:login'
+
+# A dónde redirigir DESPUÉS de un login exitoso
+LOGIN_REDIRECT_URL = 'contabilidad:dashboard'
+
+# A dónde redirigir DESPUÉS de cerrar sesión
+LOGOUT_REDIRECT_URL = 'contabilidad:login'
+
