@@ -22,6 +22,10 @@ urlpatterns = [
     # --- Balance General ---
     path('balance-general/', views.hub_balance_general, name='hub_balance_general'), 
     path('reportes/balance-general/<int:periodo_id>/', views.balance_general, name='balance_general'),
+    
+    #--- Flujo de Efectivo ---
+    path('flujo-efectivo/', views.hub_flujo_efectivo, name='hub_flujo_efectivo'),
+    path('reportes/flujo-efectivo/<int:periodo_id>/', views.flujo_efectivo, name='flujo_efectivo'),
 
     # Configuración (Vistas Read-Only) ---
     path('configuracion/catalogo/', views.ver_catalogo, name='ver_catalogo'),
