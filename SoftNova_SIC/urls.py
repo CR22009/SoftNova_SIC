@@ -14,3 +14,6 @@ urlpatterns = [
     path('', RedirectView.as_view(url='/contabilidad/login/', permanent=True)),
 ]
 
+# --- Manejador de Error 404 ---
+# (Solo funciona si DEBUG = False)
+handler404 = 'contabilidad.views.custom_404_view'

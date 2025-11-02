@@ -663,3 +663,15 @@ def ver_periodos(request):
     }
     return render(request, 'contabilidad/periodos_readonly.html', context)
 
+# --- ========================================= ---
+# ---     Manejador de Error 404         ---
+# --- ========================================= ---
+
+def custom_404_view(request, exception):
+    """
+    Vista personalizada para manejar los errores 404 (Página no encontrada).
+    """
+    # Pasamos el 'request.user' al contexto para que el template
+    # pueda decidir si muestra el botón de "Dashboard" o "Login".
+    context = {'user': request.user}
+    return render(request, '404.html', context, status=404)

@@ -22,10 +22,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-5i7+%b1#@+7q7+r%sa$othb391m&+f9ywbck6uw1+8rfpl-msc'
 
-# SECURITY WARNING: don't run with debug turned on in production!
+# Cambiar a False en producción
 DEBUG = True
 
-ALLOWED_HOSTS = []
+# --- ¡IMPORTANTE! Requerido cuando DEBUG es False ---
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
 
 
 # Application definition
@@ -57,7 +58,7 @@ ROOT_URLCONF = 'SoftNova_SIC.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],
+        'DIRS': [BASE_DIR / 'templates'], # Correcto, apunta a la carpeta templates raíz
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
