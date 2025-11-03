@@ -1,76 +1,117 @@
 {% extends 'base.html' %}
+{% load auth_extras %}
 
 {% block title %}Dashboard - SoftNova SIC{% endblock %}
-
 {% block page_title %}Dashboard{% endblock %}
 
-{% block content %}
-    
-    <!-- Mensaje de Bienvenida y Estado del Período -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <div class="md:col-span-2 bg-white p-6 rounded-lg shadow-md">
-            <h3 class="text-xl font-semibold text-sic-dark-blue">
-                Bienvenido, {% if user.first_name %}{{ user.first_name }}{% else %}{{ user.username }}{% endif %}!
-            </h3>
-            <p class="text-gray-600 mt-2">
-                Sistema de Información Contable (SIC) de SoftNova S.A de C.V.
-            </p>
-        </div>
-        <div class="bg-sic-teal text-white p-6 rounded-lg shadow-md flex items-center justify-center">
-            {% if periodo_abierto %}
-                <div class="text-center">
-                    <span class="block text-sm uppercase tracking-wide opacity-80">Período Abierto</span>
-                    <span class="block text-2xl font-bold">{{ periodo_abierto.nombre }}</span>
-                </div>
-            {% else %}
-                <div class="text-center">
-                    <span class="block text-lg font-semibold">No hay período abierto</span>
-                    <p class="text-sm opacity-90">(Contacte al Administrador)</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- Acciones Rápidas -->
-    <div class="mb-6">
-        <a href="{% url 'contabilidad:registrar_asiento' %}" class="inline-block bg-sic-medium-blue hover:bg-sic-dark-blue text-white font-semibold py-3 px-5 rounded-lg shadow-md transition-colors duration-200">
-            + Registrar Nuevo Asiento
-        </a>
-    </div>
-
-    <!-- Últimos Asientos Registrados -->
-    <div class="bg-white p-6 rounded-lg shadow-md">
-        <h4 class="text-lg font-semibold text-gray-700 mb-4">Últimos Asientos Registrados</h4>
-        <div class="overflow-x-auto">
-            <table class="w-full min-w-lg">
-                <thead class="border-b border-gray-200">
-                    <tr>
-                        <th class="text-left text-sm font-semibold text-gray-600 p-3">Fecha</th>
-                        <th class="text-left text-sm font-semibold text-gray-600 p-3">Período</th>
-                        <th class="text-left text-sm font-semibold text-gray-600 p-3">Partida N°</th>
-                        <th class="text-left text-sm font-semibold text-gray-600 p-3">Concepto</th>
-                        <th class="text-right text-sm font-semibold text-gray-600 p-3">Monto</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for asiento in ultimos_asientos %}
-                        <tr class="hover:bg-gray-50 border-b border-gray-200">
-                            <td class="p-3 text-gray-700">{{ asiento.fecha|date:"d/m/Y" }}</td>
-                            <td class="p-3 text-gray-700">{{ asiento.periodo.nombre }}</td>
-                            <td class="p-3 text-gray-700 font-medium">#{{ asiento.numero_partida }}</td>
-                            <td class="p-3 text-gray-700">{{ asiento.descripcion|truncatechars:50 }}</td>
-                            <td class="p-3 text-gray-800 text-right font-mono">${{ asiento.total_debe|floatformat:2 }}</td>
-                        </tr>
-                    {% empty %}
-                        <tr>
-                            <td colspan="5" class="p-4 text-center text-gray-500">
-                                No se han registrado asientos todavía.
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-
+{% block header_action %}
+    <!-- Acciones rápidas (Solo para Admin/Contador) -->
+    {% if user|has_group:"Administrador" or user|has_group:"Contador" %}
+    <a href="{% url 'contabilidad:registrar_asiento' %}" class="bg-sic-primary hover:bg-sic-secondary text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-colors duration-200 flex items-center space-x-2">
+        <ion-icon name="add-outline" class="text-xl"></ion-icon>
+        <span>Nuevo Asiento</span>
+    </a>
+    {% endif %}
 {% endblock %}
+
+
+{% block content %}
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    
+    <!-- Tarjeta de Período Abierto -->
+    <div class="bg-sic-light-teal p-6 rounded-lg shadow-md">
+        <div class="flex items-center space-x-4">
+            <div class="p-3 rounded-full bg-green-100 text-green-600">
+                <ion-icon name="folder-open-outline" class="text-2xl"></ion-icon>
+            </div>
+            <div>
+                <span class="text-sm font-medium text-white">Período Abierto</span>
+                {% if periodo_abierto %}
+                    <p class="text-xl font-semibold text-white">{{ periodo_abierto.nombre }}</p>
+                    <span class="text-xs text-white">Del {{ periodo_abierto.fecha_inicio|date:"d/m/Y" }} al {{ periodo_abierto.fecha_fin|date:"d/m/Y" }}</span>
+                {% else %}
+                    <p class="text-xl font-semibold text-red-600">Ninguno</p>
+                    <span class="text-xs text-red-400">Cree un período para comenzar.</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Tarjeta de Total Asientos -->
+    <div class="bg-sic-light-teal p-6 rounded-lg shadow-md">
+        <div class="flex items-center space-x-4">
+            <div class="p-3 rounded-full bg-blue-100 text-blue-600">
+                <ion-icon name="document-text-outline" class="text-2xl"></ion-icon>
+            </div>
+            <div>
+                <span class="text-sm font-medium text-white">Total Asientos Históricos</span>
+                <p class="text-2xl font-semibold text-white">{{ ultimos_asientos.count }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tarjeta de Usuario -->
+    <div class="bg-sic-light-teal p-6 rounded-lg shadow-md">
+        <div class="flex items-center space-x-4">
+            <div class="p-3 rounded-full bg-green-100/20 text-sic-secondary">
+                <ion-icon name="person-circle-outline" class="text-2xl"></ion-icon>
+            </div>
+            <div>
+                <span class="text-sm font-medium text-white">Usuario Activo</span>
+                <p class="text-xl font-semibold text-white truncate">{{ user.username }}</p>
+                <span class="text-xs text-white">Rol: {{ user.groups.all.0.name }}</span>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Tabla de Registro Histórico -->
+<div class="mt-8 bg-white p-6 rounded-lg shadow-md">
+    <h3 class="text-xl font-semibold text-sic-darkest-blue mb-4">Registro Histórico de Asientos</h3>
+    
+    <!-- INICIO DE MODIFICACIÓN: Contenedor con Scroll -->
+    <div class="overflow-y-auto max-h-96 border border-gray-200 rounded-lg">
+    <!-- FIN DE MODIFICACIÓN -->
+        
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50 sticky top-0">
+                <tr>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">N° Partida</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cuentas Afectadas</th>
+                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Monto</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for asiento in ultimos_asientos %}
+                <tr class="{% if asiento.es_asiento_automatico %}bg-blue-50{% endif %}">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ asiento.fecha|date:"d/m/Y" }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">P-{{ asiento.numero_partida }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 truncate max-w-xs">{{ asiento.descripcion }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500">
+                        <!-- Bucle anidado para mostrar cuentas (eficiente gracias a prefetch_related) -->
+                        {% for mov in asiento.movimientos.all %}
+                            <div>
+                                <!-- INICIO DE MODIFICACIÓN: Tachar cuentas inactivas -->
+                                <span class="{% if not mov.cuenta.esta_activa %}line-through text-red-500{% endif %}">
+                                    {{ mov.cuenta.codigo }} - {{ mov.cuenta.nombre }}
+                                </span>
+                                <!-- FIN DE MODIFICACIÓN -->
+                            </div>
+                        {% endfor %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-mono">${{ asiento.total_debe|floatformat:2 }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="px-6 py-4 text-center text-gray-500">No hay asientos registrados.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+

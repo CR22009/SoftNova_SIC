@@ -22,10 +22,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-5i7+%b1#@+7q7+r%sa$othb391m&+f9ywbck6uw1+8rfpl-msc'
 
-# SECURITY WARNING: don't run with debug turned on in production!
+# Cambiar a False en producción
 DEBUG = True
 
-ALLOWED_HOSTS = []
+# --- ¡IMPORTANTE! Requerido cuando DEBUG es False ---
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
 
 
 # Application definition
@@ -39,6 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'contabilidad',
     
+    # 'contabilidad.templatetags.auth_extras', <-- ESTA LÍNEA SE ELIMINÓ (CAUSA DEL ERROR)
 ]
 
 MIDDLEWARE = [
@@ -56,7 +58,7 @@ ROOT_URLCONF = 'SoftNova_SIC.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],
+        'DIRS': [BASE_DIR / 'templates'], # Correcto, apunta a la carpeta templates raíz
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -64,6 +66,8 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
             ],
+            # La sección 'builtins' también se eliminó
+            # ya que causa el mismo error de AppRegistryNotReady
         },
     },
 ]
@@ -104,9 +108,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
-
-TIME_ZONE = 'UTC'
+# --- MODIFICADO: Para que coincida con tu ubicación ---
+LANGUAGE_CODE = 'es-sv'
+TIME_ZONE = 'America/El_Salvador'
 
 USE_I18N = True
 
@@ -122,3 +126,16 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# --- NUEVO: Configuraciones de Autenticación Personalizada ---
+
+# A dónde redirigir si el usuario NO está logueado e intenta acceder a una página protegida
+LOGIN_URL = 'contabilidad:login'
+
+# A dónde redirigir DESPUÉS de un login exitoso
+LOGIN_REDIRECT_URL = 'contabilidad:dashboard'
+
+# A dónde redirigir DESPUÉS de cerrar sesión
+LOGOUT_REDIRECT_URL = 'contabilidad:login'
+

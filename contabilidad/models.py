@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from decimal import Decimal
+from django.db.models import Sum, Q # Importar Q
 
 # --- Modelo de Catálogo de Cuentas ---
 
@@ -63,6 +64,12 @@ class Cuenta(models.Model):
         default=False,
         help_text="Indica si la cuenta puede recibir movimientos (transacciones)"
     )
+    
+    # --- NUEVO CAMPO PARA SOFT DELETE ---
+    esta_activa = models.BooleanField(
+        default=True,
+        help_text="Indica si la cuenta está activa. Las cuentas inactivas no se pueden usar en nuevos asientos."
+    )
 
     class Meta:
         ordering = ['codigo']
@@ -71,6 +78,27 @@ class Cuenta(models.Model):
 
     def __str__(self):
         return f"{self.codigo} - {self.nombre}"
+
+    def get_saldo_total(self):
+        """
+        Calcula el saldo neto total (histórico) de esta cuenta.
+        Se usa para verificar si se puede eliminar.
+        """
+        if not self.es_imputable:
+            # Las cuentas de grupo no tienen saldo propio
+            return Decimal('0.00')
+
+        agregado = self.movimiento_set.aggregate(
+            total_debe=Sum('debe'),
+            total_haber=Sum('haber')
+        )
+        total_debe = agregado.get('total_debe') or Decimal('0.00')
+        total_haber = agregado.get('total_haber') or Decimal('0.00')
+        
+        if self.naturaleza == self.NaturalezaCuenta.DEUDORA:
+            return total_debe - total_haber
+        else:
+            return total_haber - total_debe
 
 # --- Modelo de Períodos Contables ---
 
@@ -95,6 +123,23 @@ class PeriodoContable(models.Model):
         choices=EstadoPeriodo.choices,
         default=EstadoPeriodo.ABIERTO
     )
+
+    # --- NUEVOS CAMPOS PARA EL CIERRE ---
+    asiento_cierre = models.ForeignKey(
+        'AsientoDiario',
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='periodo_cerrado_por',
+        help_text="Asiento de Cierre (Resultados) de este período."
+    )
+    asiento_apertura_siguiente = models.ForeignKey(
+        'AsientoDiario',
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='periodo_abierto_por',
+        help_text="Asiento de Apertura (Balance) creado para el *siguiente* período."
+    )
+    # --- FIN DE NUEVOS CAMPOS ---
 
     class Meta:
         ordering = ['-fecha_inicio']
@@ -140,6 +185,13 @@ class AsientoDiario(models.Model):
         related_name="asientos_creados"
     )
     creado_en = models.DateTimeField(auto_now_add=True)
+    
+    # --- NUEVO CAMPO PARA CIERRE/APERTURA ---
+    es_asiento_automatico = models.BooleanField(
+        default=False,
+        help_text="Indica si es un asiento de Cierre o Apertura generado por el sistema."
+    )
+    # --- FIN DE NUEVO CAMPO ---
 
     class Meta:
         ordering = ['periodo', 'numero_partida']
@@ -156,10 +208,10 @@ class AsientoDiario(models.Model):
         Validaciones personalizadas antes de guardar.
         """
         # 1. Validar que el período esté abierto
-        # (Se comprueba en el 'save' para asegurar que el periodo existe,
-        # pero también es bueno tenerlo aquí para validación de formularios)
         if hasattr(self, 'periodo') and self.periodo.estado == PeriodoContable.EstadoPeriodo.CERRADO:
-            raise ValidationError(f"El período '{self.periodo.nombre}' está cerrado. No se pueden registrar transacciones.")
+            # Permitir asientos automáticos incluso si el período se está cerrando
+            if not self.es_asiento_automatico:
+                raise ValidationError(f"El período '{self.periodo.nombre}' está cerrado. No se pueden registrar transacciones.")
         
         # 2. Validar que la fecha del asiento esté dentro del rango del período
         if hasattr(self, 'periodo') and self.fecha:
@@ -176,7 +228,9 @@ class AsientoDiario(models.Model):
         """
         
         # Validar período y fecha antes de asignar número
-        self.clean()
+        # No validamos si es un asiento automático (para evitar problemas en el cierre)
+        if not self.es_asiento_automatico:
+            self.clean()
         
         # Asignar número de partida solo al crear un nuevo asiento
         if not self.pk and self.periodo:
@@ -223,7 +277,8 @@ class Movimiento(models.Model):
         on_delete=models.PROTECT, # No borrar cuentas con movimientos
         help_text="Cuenta contable afectada",
         # Optimización: Solo mostrar cuentas que pueden recibir transacciones
-        limit_choices_to={'es_imputable': True}
+        # Y que estén ACTIVAS (esta es la clave del soft delete)
+        limit_choices_to={'es_imputable': True, 'esta_activa': True}
     )
     debe = models.DecimalField(
         max_digits=12, 
@@ -252,3 +307,8 @@ class Movimiento(models.Model):
         # 2. Validar que la cuenta sea imputable (aunque limit_choices_to ayuda)
         if not self.cuenta.es_imputable:
             raise ValidationError(f"La cuenta '{self.cuenta.nombre}' no es imputable. No puede recibir movimientos.")
+            
+        # 3. Validar que la cuenta esté activa
+        if not self.cuenta.esta_activa:
+            raise ValidationError(f"La cuenta '{self.cuenta.nombre}' está inactiva y no puede recibir nuevos movimientos.")
+
