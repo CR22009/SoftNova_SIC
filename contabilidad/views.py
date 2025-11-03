@@ -1,7 +1,7 @@
 from django.utils.timezone import now
 from calendar import monthrange
 from datetime import date
-from django.urls import reverse
+from django.urls import reverse, reverse_lazy
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db import transaction, models
@@ -12,8 +12,8 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.forms import AuthenticationForm
 # --- Fin Imports Login ---
 from .models import AsientoDiario, PeriodoContable, Cuenta, Movimiento
-# --- MODIFICADO: Importar el nuevo PeriodoForm ---
-from .forms import AsientoDiarioForm, MovimientoFormSet, PeriodoForm
+# --- MODIFICADO: Importar el nuevo PeriodoForm y CuentaForm ---
+from .forms import AsientoDiarioForm, MovimientoFormSet, PeriodoForm, CuentaForm
 from decimal import Decimal
 from datetime import date, timedelta
 from calendar import monthrange
@@ -97,10 +97,13 @@ def check_acceso_costeo(user):
 # --- ========================================= ---
 # ---     Dashboard (Sin cambios, solo @login_required) ---
 # --- ========================================= ---
-@login_required
 def dashboard(request):
     """Página principal del sistema."""
-    ultimos_asientos = AsientoDiario.objects.order_by('-fecha', '-numero_partida')[:5]
+    
+    ultimos_asientos = AsientoDiario.objects.prefetch_related(
+        'movimientos__cuenta'
+    ).order_by('-fecha', '-numero_partida')
+
     periodo_abierto = PeriodoContable.objects.filter(estado=PeriodoContable.EstadoPeriodo.ABIERTO).first()
     context = {
         'ultimos_asientos': ultimos_asientos,
@@ -259,6 +262,7 @@ def balanza_comprobacion(request, periodo_id):
     """Muestra la Balanza de Comprobación para un período."""
     periodo = get_object_or_404(PeriodoContable, pk=periodo_id)
     # Solo cuentas imputables
+    # --- MODIFICADO: Ahora muestra cuentas activas e inactivas (para reportes históricos)
     cuentas = Cuenta.objects.filter(es_imputable=True).order_by('codigo')
     
     resultados = []
@@ -292,6 +296,7 @@ def balanza_comprobacion(request, periodo_id):
                 'nombre': cuenta.nombre,
                 'saldo_deudor': saldo_deudor,
                 'saldo_acreedor': saldo_acreedor,
+                'esta_activa': cuenta.esta_activa # Pasar estado al template
             })
             total_saldo_deudor += saldo_deudor
             total_saldo_acreedor += saldo_acreedor
@@ -317,6 +322,7 @@ def balanza_comprobacion(request, periodo_id):
 # --- Funciones Auxiliares ---
 def _calcular_saldos_cuentas_por_tipo(periodo, tipo_cuenta):
     """Calcula saldos de cuentas imputables para un tipo (ER, BG)."""
+    # --- MODIFICADO: Incluye cuentas inactivas para reportes históricos ---
     cuentas = Cuenta.objects.filter(tipo_cuenta=tipo_cuenta, es_imputable=True).order_by('codigo')
     lista_saldos = []
     total_general_tipo = Decimal('0.00')
@@ -666,15 +672,110 @@ def estado_patrimonio(request, periodo_id):
 # --- ========================================= ---
 # ---           Vistas de Configuración         ---
 # --- ========================================= ---
+
+# --- MODIFICADO: VISTA DE GESTIÓN DE CATÁLOGO (REEMPLAZA ver_catalogo) ---
 @login_required
 @user_passes_test(check_acceso_contable) # Sigue siendo accesible para ambos
-def ver_catalogo(request):
-    """Muestra el Catálogo de Cuentas (Solo Lectura)."""
+def gestionar_catalogo(request):
+    """
+    Vista CRUD para el Catálogo de Cuentas.
+    - Admin: Puede Crear, Leer, Actualizar, Eliminar (Soft Delete).
+    - Contador: Solo puede Leer.
+    """
+    # Obtenemos todas las cuentas principales (activas e inactivas)
     cuentas_principales = Cuenta.objects.filter(padre__isnull=True).order_by('codigo')
     context = {
         'cuentas_principales': cuentas_principales,
     }
-    return render(request, 'contabilidad/catalogo_readonly.html', context)
+    # Reutilizamos la plantilla, que ahora tendrá la lógica de roles
+    return render(request, 'contabilidad/gestionar_catalogo.html', context)
+
+# --- NUEVO: Vista para CREAR cuenta ---
+@login_required
+@user_passes_test(check_acceso_admin) # Solo Admin
+def crear_cuenta(request, padre_id=None):
+    """
+    Maneja el formulario para crear una nueva cuenta.
+    Si se pasa 'padre_id', la pre-selecciona en el formulario.
+    """
+    cuenta_padre = None
+    if padre_id:
+        cuenta_padre = get_object_or_404(Cuenta, pk=padre_id, es_imputable=False, esta_activa=True)
+    
+    if request.method == 'POST':
+        form = CuentaForm(request.POST)
+        if form.is_valid():
+            nueva_cuenta = form.save()
+            messages.success(request, f"Cuenta '{nueva_cuenta.nombre}' creada exitosamente.")
+            return redirect('contabilidad:gestionar_catalogo')
+    else:
+        # Pre-llenar el campo 'padre' si se proporcionó un ID
+        form = CuentaForm(initial={'padre': cuenta_padre})
+        
+    context = {
+        'form': form,
+        'titulo': 'Crear Nueva Cuenta'
+    }
+    return render(request, 'contabilidad/cuenta_form.html', context)
+
+# --- NUEVO: Vista para EDITAR cuenta ---
+@login_required
+@user_passes_test(check_acceso_admin) # Solo Admin
+def editar_cuenta(request, cuenta_id):
+    """
+    Maneja el formulario para editar una cuenta existente.
+    """
+    cuenta = get_object_or_404(Cuenta, pk=cuenta_id)
+    
+    if request.method == 'POST':
+        form = CuentaForm(request.POST, instance=cuenta)
+        if form.is_valid():
+            cuenta_editada = form.save()
+            messages.success(request, f"Cuenta '{cuenta_editada.nombre}' actualizada exitosamente.")
+            return redirect('contabilidad:gestionar_catalogo')
+    else:
+        form = CuentaForm(instance=cuenta)
+        
+    context = {
+        'form': form,
+        'cuenta': cuenta,
+        'titulo': f"Editando: {cuenta.nombre}"
+    }
+    return render(request, 'contabilidad/cuenta_form.html', context)
+
+# --- NUEVO: Vista para ELIMINAR (Soft Delete) cuenta ---
+@login_required
+@user_passes_test(check_acceso_admin) # Solo Admin
+@transaction.atomic
+def eliminar_cuenta(request, cuenta_id):
+    """
+    Maneja la eliminación lógica (soft delete) de una cuenta.
+    Solo permite "eliminar" si la cuenta no tiene saldo.
+    """
+    # Solo aceptar peticiones POST por seguridad
+    if request.method != 'POST':
+        return redirect('contabilidad:gestionar_catalogo')
+        
+    cuenta = get_object_or_404(Cuenta, pk=cuenta_id)
+    
+    # 1. Verificar si la cuenta tiene hijos activos
+    if cuenta.hijos.filter(esta_activa=True).exists():
+        messages.error(request, f"Error: No se puede eliminar '{cuenta.nombre}' porque tiene sub-cuentas activas. Debe eliminar o reasignar las sub-cuentas primero.")
+        return redirect('contabilidad:gestionar_catalogo')
+        
+    # 2. Verificar si la cuenta es imputable y tiene saldo
+    if cuenta.es_imputable:
+        saldo = cuenta.get_saldo_total()
+        if saldo != Decimal('0.00'):
+            messages.error(request, f"Error: No se puede eliminar '{cuenta.nombre}' porque tiene un saldo de ${saldo}. Debe registrar una transacción para mover el saldo a otra cuenta.")
+            return redirect('contabilidad:gestionar_catalogo')
+            
+    # 3. Si pasa las validaciones, proceder con el soft delete
+    cuenta.esta_activa = False
+    cuenta.save()
+    messages.success(request, f"Cuenta '{cuenta.nombre}' eliminada (desactivada) exitosamente.")
+    return redirect('contabilidad:gestionar_catalogo')
+
 
 # --- MODIFICADO: VISTA DE GESTIÓN DE PERÍODOS ---
 @login_required
@@ -737,16 +838,11 @@ def gestionar_periodos(request):
 
     # --- Lógica GET (Mostrar la página) ---
     
-    # Calcular fechas sugeridas para el formulario
-    ultimo_periodo = PeriodoContable.objects.order_by('-fecha_fin').first()
-    if ultimo_periodo:
-        fecha_inicio_sugerida = (ultimo_periodo.fecha_fin + timedelta(days=1))
-    else:
-        fecha_inicio_sugerida = date.today().replace(day=1)
-        
-    ultimo_dia_sugerido = monthrange(fecha_inicio_sugerida.year, fecha_inicio_sugerida.month)[1]
-    fecha_fin_sugerida = fecha_inicio_sugerida.replace(day=ultimo_dia_sugerido)
-    nombre_sugerido = fecha_inicio_sugerida.strftime('%B %Y').capitalize()
+    # --- MODIFICACIÓN: Fechas sugeridas (Hoy + 30 días) ---
+    fecha_inicio_sugerida = date.today()
+    fecha_fin_sugerida = fecha_inicio_sugerida + timedelta(days=29) 
+    nombre_sugerido = f"Período desde {fecha_inicio_sugerida.strftime('%d-%m-%Y')}"
+    # --- FIN DE MODIFICACIÓN ---
 
     # Si la solicitud fue POST y falló, 'form' ya tendrá los datos y errores.
     # Si es GET, creamos el formulario con las fechas sugeridas.
@@ -874,6 +970,7 @@ def _crear_asiento_apertura(nuevo_periodo, periodo_anterior, request):
 
     # 1. Obtener todas las cuentas de Balance (Activo, Pasivo, Patrimonio)
     tipos_balance = [Cuenta.TipoCuenta.ACTIVO, Cuenta.TipoCuenta.PASIVO, Cuenta.TipoCuenta.PATRIMONIO]
+    # --- MODIFICADO: Incluye cuentas inactivas para traspasar saldos ---
     cuentas_balance = Cuenta.objects.filter(tipo_cuenta__in=tipos_balance, es_imputable=True)
 
     movimientos_apertura = []
@@ -895,7 +992,7 @@ def _crear_asiento_apertura(nuevo_periodo, periodo_anterior, request):
         if cuenta.naturaleza == Cuenta.NaturalezaCuenta.DEUDORA:
              saldo_final = saldo_debe - saldo_haber
         else:
-             saldo = saldo_haber - saldo_debe
+             saldo_final = saldo_haber - saldo_debe
         
         # --- Lógica de Traspaso de Utilidad ---
         if cuenta.codigo == cuenta_utilidad_ejercicio.codigo:
@@ -914,6 +1011,12 @@ def _crear_asiento_apertura(nuevo_periodo, periodo_anterior, request):
             
         # Crear movimiento de apertura
         if saldo_final != 0:
+            # --- VALIDACIÓN: No crear movimientos de apertura para cuentas inactivas
+            # (Excepto para 'Resultados Acumulados' que recibe el saldo)
+            if not cuenta.esta_activa and cuenta.codigo != cuenta_resultados_acum.codigo:
+                messages.warning(request, f"Se omitió el saldo de {saldo_final} de la cuenta inactiva '{cuenta.nombre}' en el asiento de apertura.")
+                continue
+
             if saldo_final > 0: # Saldo normal según naturaleza
                 if cuenta.naturaleza == Cuenta.NaturalezaCuenta.DEUDORA: # Activos
                     movimientos_apertura.append(Movimiento(cuenta=cuenta, debe=saldo_final, haber=0))
@@ -975,5 +1078,4 @@ def custom_404_view(request, exception):
     # pueda decidir si muestra el botón de "Dashboard" o "Login".
     context = {'user': request.user}
     return render(request, '404.html', context, status=404)
-
 

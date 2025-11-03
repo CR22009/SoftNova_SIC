@@ -35,13 +35,24 @@ urlpatterns = [
     path('estado-patrimonio/', views.hub_estado_patrimonio, name='hub_estado_patrimonio'),
     path('reportes/estado-patrimonio/<int:periodo_id>/', views.estado_patrimonio, name='estado_patrimonio'),
 
-    # Configuración (Vistas Read-Only) ---
-    path('configuracion/catalogo/', views.ver_catalogo, name='ver_catalogo'),
+    # --- INICIO: CRUD de Catálogo de Cuentas ---
+    # 1. READ (Listar) - Reemplaza a ver_catalogo
+    path('configuracion/catalogo/', views.gestionar_catalogo, name='gestionar_catalogo'),
     
-    # --- MODIFICADO: Nueva vista de Gestión de Períodos ---
+    # 2. CREATE (Crear)
+    path('configuracion/catalogo/crear/', views.crear_cuenta, name='crear_cuenta'),
+    path('configuracion/catalogo/crear/<int:padre_id>/', views.crear_cuenta, name='crear_cuenta_hija'),
+    
+    # 3. UPDATE (Editar)
+    path('configuracion/catalogo/editar/<int:cuenta_id>/', views.editar_cuenta, name='editar_cuenta'),
+    
+    # 4. DELETE (Eliminar - Soft Delete)
+    path('configuracion/catalogo/eliminar/<int:cuenta_id>/', views.eliminar_cuenta, name='eliminar_cuenta'),
+    # --- FIN: CRUD de Catálogo de Cuentas ---
+    
+    
+    # --- Gestión de Períodos ---
     path('configuracion/periodos/', views.gestionar_periodos, name='gestionar_periodos'),
-    
-    # --- NUEVA RUTA: Acción de Cerrar Período ---
     path('configuracion/periodos/cerrar/<int:periodo_id>/', views.cerrar_periodo, name='cerrar_periodo'),
 ]
 
