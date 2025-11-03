@@ -1,3 +1,7 @@
+from django.utils.timezone import now
+from calendar import monthrange
+from datetime import date
+from django.urls import reverse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db import transaction, models
@@ -10,6 +14,8 @@ from django.contrib.auth.forms import AuthenticationForm
 from .models import AsientoDiario, PeriodoContable, Cuenta, Movimiento
 from .forms import AsientoDiarioForm, MovimientoFormSet
 from decimal import Decimal
+from datetime import date, timedelta
+from calendar import monthrange
 
 # --- ========================================= ---
 # ---     AUTENTICACIÓN Y ROLES (NUEVO)         ---
@@ -60,6 +66,12 @@ def logout_view(request):
 def es_grupo_administrador(user):
     """Verifica si el usuario pertenece al grupo 'Administrador'."""
     return user.groups.filter(name='Administrador').exists()
+
+def check_acceso_admin(user):
+    """Verifica si el usuario tiene rol de Administrador o es Superuser."""
+    if not user.is_authenticated:
+        return False
+    return user.is_superuser or es_grupo_administrador(user)
 
 def es_grupo_contador(user):
     """Verifica si el usuario pertenece al grupo 'Contador'."""
@@ -640,11 +652,10 @@ def estado_patrimonio(request, periodo_id):
     return render(request, 'contabilidad/estado_patrimonio.html', context)
 
 # --- ========================================= ---
-# ---     Vistas de Configuración (Read-Only) ---
+# ---           Vistas de Configuración         ---
 # --- ========================================= ---
-
 @login_required
-@user_passes_test(check_acceso_contable) # <-- DECORADOR ACTUALIZADO
+@user_passes_test(check_acceso_contable) # Sigue siendo accesible para ambos
 def ver_catalogo(request):
     """Muestra el Catálogo de Cuentas (Solo Lectura)."""
     cuentas_principales = Cuenta.objects.filter(padre__isnull=True).order_by('codigo')
@@ -653,15 +664,198 @@ def ver_catalogo(request):
     }
     return render(request, 'contabilidad/catalogo_readonly.html', context)
 
+# --- NUEVA VISTA DE GESTIÓN DE PERÍODOS ---
 @login_required
-@user_passes_test(check_acceso_contable) # <-- DECORADOR ACTUALIZADO
-def ver_periodos(request):
-    """Muestra los Períodos Contables (Solo Lectura)."""
+@user_passes_test(check_acceso_contable) # Accesible para Admin y Contador
+def gestionar_periodos(request):
+    """
+    Vista personalizada para gestionar Períodos Contables.
+    - Admin: Puede crear y cerrar períodos.
+    - Contador: Solo puede ver.
+    """
     periodos = PeriodoContable.objects.all().order_by('-fecha_inicio')
+    periodo_abierto = periodos.filter(estado=PeriodoContable.EstadoPeriodo.ABIERTO).first()
+    
+    # Lógica para crear un nuevo período
+    if request.method == 'POST' and check_acceso_admin(request.user):
+        try:
+            ultimo_periodo = PeriodoContable.objects.order_by('-fecha_fin').first()
+            if not ultimo_periodo:
+                # No hay períodos, crear el primero
+                fecha_inicio = date.today().replace(day=1)
+            else:
+                # Calcular el mes siguiente al último período
+                fecha_inicio = (ultimo_periodo.fecha_fin + timedelta(days=1))
+            
+            # Calcular el último día del mes
+            ultimo_dia = monthrange(fecha_inicio.year, fecha_inicio.month)[1]
+            fecha_fin = fecha_inicio.replace(day=ultimo_dia)
+            
+            # Formatear el nombre
+            nombre_mes = fecha_inicio.strftime('%B %Y').capitalize()
+            
+            # Verificar si ya existe
+            if PeriodoContable.objects.filter(nombre=nombre_mes).exists():
+                messages.error(request, f"El período '{nombre_mes}' ya existe.")
+            else:
+                PeriodoContable.objects.create(
+                    nombre=nombre_mes,
+                    fecha_inicio=fecha_inicio,
+                    fecha_fin=fecha_fin,
+                    estado=PeriodoContable.EstadoPeriodo.ABIERTO
+                )
+                messages.success(request, f"Período '{nombre_mes}' creado exitosamente.")
+                # Si no había período abierto, este se vuelve el de apertura
+                
+        except Exception as e:
+            messages.error(request, f"Error al crear el período: {e}")
+        
+        return redirect('contabilidad:gestionar_periodos')
+
     context = {
         'periodos': periodos,
+        'periodo_abierto': periodo_abierto,
     }
-    return render(request, 'contabilidad/periodos_readonly.html', context)
+    return render(request, 'contabilidad/gestionar_periodos.html', context)
+
+
+@login_required
+@user_passes_test(check_acceso_admin) # Solo el Admin puede CERRAR
+@transaction.atomic
+def cerrar_periodo(request, periodo_id):
+    """
+    Ejecuta la lógica contable para cerrar un período y abrir el siguiente.
+    """
+    if request.method != 'POST':
+        return redirect('contabilidad:gestionar_periodos')
+
+    periodo_a_cerrar = get_object_or_404(PeriodoContable, pk=periodo_id)
+    if periodo_a_cerrar.estado == PeriodoContable.EstadoPeriodo.CERRADO:
+        messages.error(request, "Este período ya está cerrado.")
+        return redirect('contabilidad:gestionar_periodos')
+        
+    # CUENTAS CLAVE (basadas en tu catálogo PDF)
+    try:
+        cuenta_utilidad_ejercicio = Cuenta.objects.get(codigo='34') # Utilidad o Pérdida del Ejercicio
+        cuenta_resultados_acum = Cuenta.objects.get(codigo='33') # Resultados Acumulados
+    except Cuenta.DoesNotExist:
+        messages.error(request, "Error: No se encontraron las cuentas '34' (Utilidad del Ejercicio) o '33' (Resultados Acumulados) en el catálogo.")
+        return redirect('contabilidad:gestionar_periodos')
+
+    # --- 1. CREAR ASIENTO DE CIERRE (RESULTADOS) ---
+    utilidad_neta = _get_utilidad_del_ejercicio(periodo_a_cerrar)
+    
+    asiento_cierre = AsientoDiario.objects.create(
+        periodo=periodo_a_cerrar,
+        fecha=periodo_a_cerrar.fecha_fin,
+        descripcion=f"Asiento de Cierre - {periodo_a_cerrar.nombre}",
+        creado_por=request.user,
+        es_asiento_automatico=True
+    )
+    
+    movimientos_cierre = []
+    
+    # Cuentas de Resultado (Ingresos, Costos, Gastos)
+    tipos_resultado = [Cuenta.TipoCuenta.INGRESO, Cuenta.TipoCuenta.COSTO, Cuenta.TipoCuenta.GASTO]
+    cuentas_resultado = Cuenta.objects.filter(tipo_cuenta__in=tipos_resultado, es_imputable=True)
+
+    for cuenta in cuentas_resultado:
+        saldo_cuenta = _calcular_saldos_cuentas_por_tipo(periodo_a_cerrar, cuenta.tipo_cuenta)[1]
+        
+        # Obtenemos el saldo individual real de la cuenta
+        agregado = Movimiento.objects.filter(asiento__periodo=periodo_a_cerrar, cuenta=cuenta).aggregate(
+            debe=Sum('debe'), haber=Sum('haber')
+        )
+        saldo = (agregado['debe'] or 0) - (agregado['haber'] or 0)
+        
+        if cuenta.naturaleza == Cuenta.NaturalezaCuenta.ACREEDORA:
+             saldo = (agregado['haber'] or 0) - (agregado['debe'] or 0)
+        
+        if saldo != 0:
+            if cuenta.naturaleza == Cuenta.NaturalezaCuenta.ACREEDORA: # Ingresos
+                movimientos_cierre.append(Movimiento(asiento=asiento_cierre, cuenta=cuenta, debe=saldo, haber=0))
+            else: # Costos y Gastos
+                movimientos_cierre.append(Movimiento(asiento=asiento_cierre, cuenta=cuenta, debe=0, haber=saldo))
+
+    # Movimiento contrapartida a Utilidad del Ejercicio ('34')
+    if utilidad_neta > 0: # Ganancia (Acreedor)
+        movimientos_cierre.append(Movimiento(asiento=asiento_cierre, cuenta=cuenta_utilidad_ejercicio, debe=0, haber=utilidad_neta))
+    elif utilidad_neta < 0: # Pérdida (Deudor)
+        movimientos_cierre.append(Movimiento(asiento=asiento_cierre, cuenta=cuenta_utilidad_ejercicio, debe=abs(utilidad_neta), haber=0))
+    
+    Movimiento.objects.bulk_create(movimientos_cierre)
+    
+    # --- 2. CREAR NUEVO PERÍODO ---
+    fecha_inicio_nuevo = (periodo_a_cerrar.fecha_fin + timedelta(days=1))
+    ultimo_dia_nuevo = monthrange(fecha_inicio_nuevo.year, fecha_inicio_nuevo.month)[1]
+    fecha_fin_nuevo = fecha_inicio_nuevo.replace(day=ultimo_dia_nuevo)
+    nombre_nuevo = fecha_inicio_nuevo.strftime('%B %Y').capitalize()
+    
+    nuevo_periodo, creado = PeriodoContable.objects.get_or_create(
+        nombre=nombre_nuevo,
+        defaults={
+            'fecha_inicio': fecha_inicio_nuevo,
+            'fecha_fin': fecha_fin_nuevo,
+            'estado': PeriodoContable.EstadoPeriodo.ABIERTO
+        }
+    )
+
+    # --- 3. CREAR ASIENTO DE APERTURA (BALANCE) ---
+    asiento_apertura = AsientoDiario.objects.create(
+        periodo=nuevo_periodo,
+        fecha=nuevo_periodo.fecha_inicio,
+        descripcion=f"Asiento de Apertura - {nuevo_periodo.nombre}",
+        creado_por=request.user,
+        es_asiento_automatico=True
+    )
+    
+    movimientos_apertura = []
+    
+    # Cuentas de Balance (Activo, Pasivo, Patrimonio)
+    tipos_balance = [Cuenta.TipoCuenta.ACTIVO, Cuenta.TipoCuenta.PASIVO, Cuenta.TipoCuenta.PATRIMONIO]
+    cuentas_balance = Cuenta.objects.filter(tipo_cuenta__in=tipos_balance, es_imputable=True)
+
+    for cuenta in cuentas_balance:
+        # Calcular saldo final del período anterior
+        agregado = Movimiento.objects.filter(asiento__periodo=periodo_a_cerrar, cuenta=cuenta).aggregate(
+            debe=Sum('debe'), haber=Sum('haber')
+        )
+        saldo_debe = (agregado['debe'] or 0)
+        saldo_haber = (agregado['haber'] or 0)
+        
+        saldo_final = Decimal('0.00')
+        if cuenta.naturaleza == Cuenta.NaturalezaCuenta.DEUDORA:
+             saldo_final = saldo_debe - saldo_haber
+        else:
+             saldo_final = saldo_haber - saldo_debe
+
+        # Traspaso de Utilidad del Ejercicio ('34') a Resultados Acumulados ('33')
+        if cuenta.codigo == cuenta_utilidad_ejercicio.codigo:
+            # No hacemos nada con la 34, su saldo se moverá a la 33
+            continue
+        elif cuenta.codigo == cuenta_resultados_acum.codigo:
+            # La 33 recibe su propio saldo MÁS el saldo de la 34
+            saldo_final += utilidad_neta # utilidad_neta ya tiene el signo correcto
+            
+        # Crear movimiento de apertura
+        if saldo_final != 0:
+            if cuenta.naturaleza == Cuenta.NaturalezaCuenta.DEUDORA: # Activos
+                movimientos_apertura.append(Movimiento(asiento=asiento_apertura, cuenta=cuenta, debe=saldo_final, haber=0))
+            else: # Pasivos, Patrimonio
+                movimientos_apertura.append(Movimiento(asiento=asiento_apertura, cuenta=cuenta, debe=0, haber=saldo_final))
+
+    Movimiento.objects.bulk_create(movimientos_apertura)
+
+    # --- 4. FINALIZAR Y GUARDAR ---
+    periodo_a_cerrar.estado = PeriodoContable.EstadoPeriodo.CERRADO
+    periodo_a_cerrar.asiento_cierre = asiento_cierre
+    periodo_a_cerrar.asiento_apertura_siguiente = asiento_apertura
+    periodo_a_cerrar.save()
+    
+    messages.success(request, f"Período '{periodo_a_cerrar.nombre}' cerrado exitosamente. Nuevo período '{nuevo_periodo.nombre}' ha sido abierto.")
+    return redirect('contabilidad:gestionar_periodos')
+
+
 
 # --- ========================================= ---
 # ---     Manejador de Error 404         ---

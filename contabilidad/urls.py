@@ -37,6 +37,11 @@ urlpatterns = [
 
     # Configuración (Vistas Read-Only) ---
     path('configuracion/catalogo/', views.ver_catalogo, name='ver_catalogo'),
-    path('configuracion/periodos/', views.ver_periodos, name='ver_periodos'),
+    
+    # --- MODIFICADO: Nueva vista de Gestión de Períodos ---
+    path('configuracion/periodos/', views.gestionar_periodos, name='gestionar_periodos'),
+    
+    # --- NUEVA RUTA: Acción de Cerrar Período ---
+    path('configuracion/periodos/cerrar/<int:periodo_id>/', views.cerrar_periodo, name='cerrar_periodo'),
 ]
 

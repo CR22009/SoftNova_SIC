@@ -96,6 +96,23 @@ class PeriodoContable(models.Model):
         default=EstadoPeriodo.ABIERTO
     )
 
+    # --- NUEVOS CAMPOS PARA EL CIERRE ---
+    asiento_cierre = models.ForeignKey(
+        'AsientoDiario',
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='periodo_cerrado_por',
+        help_text="Asiento de Cierre (Resultados) de este período."
+    )
+    asiento_apertura_siguiente = models.ForeignKey(
+        'AsientoDiario',
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='periodo_abierto_por',
+        help_text="Asiento de Apertura (Balance) creado para el *siguiente* período."
+    )
+    # --- FIN DE NUEVOS CAMPOS ---
+
     class Meta:
         ordering = ['-fecha_inicio']
         verbose_name = "Período Contable"
@@ -140,6 +157,13 @@ class AsientoDiario(models.Model):
         related_name="asientos_creados"
     )
     creado_en = models.DateTimeField(auto_now_add=True)
+    
+    # --- NUEVO CAMPO PARA CIERRE/APERTURA ---
+    es_asiento_automatico = models.BooleanField(
+        default=False,
+        help_text="Indica si es un asiento de Cierre o Apertura generado por el sistema."
+    )
+    # --- FIN DE NUEVO CAMPO ---
 
     class Meta:
         ordering = ['periodo', 'numero_partida']
@@ -156,10 +180,10 @@ class AsientoDiario(models.Model):
         Validaciones personalizadas antes de guardar.
         """
         # 1. Validar que el período esté abierto
-        # (Se comprueba en el 'save' para asegurar que el periodo existe,
-        # pero también es bueno tenerlo aquí para validación de formularios)
         if hasattr(self, 'periodo') and self.periodo.estado == PeriodoContable.EstadoPeriodo.CERRADO:
-            raise ValidationError(f"El período '{self.periodo.nombre}' está cerrado. No se pueden registrar transacciones.")
+            # Permitir asientos automáticos incluso si el período se está cerrando
+            if not self.es_asiento_automatico:
+                raise ValidationError(f"El período '{self.periodo.nombre}' está cerrado. No se pueden registrar transacciones.")
         
         # 2. Validar que la fecha del asiento esté dentro del rango del período
         if hasattr(self, 'periodo') and self.fecha:
@@ -176,7 +200,9 @@ class AsientoDiario(models.Model):
         """
         
         # Validar período y fecha antes de asignar número
-        self.clean()
+        # No validamos si es un asiento automático (para evitar problemas en el cierre)
+        if not self.es_asiento_automatico:
+            self.clean()
         
         # Asignar número de partida solo al crear un nuevo asiento
         if not self.pk and self.periodo:
@@ -252,3 +278,4 @@ class Movimiento(models.Model):
         # 2. Validar que la cuenta sea imputable (aunque limit_choices_to ayuda)
         if not self.cuenta.es_imputable:
             raise ValidationError(f"La cuenta '{self.cuenta.nombre}' no es imputable. No puede recibir movimientos.")
+

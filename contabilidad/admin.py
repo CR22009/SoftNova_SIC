@@ -32,11 +32,14 @@ class PeriodoContableAdmin(admin.ModelAdmin):
     """
     Admin para que el 'Admin' del sistema gestione los períodos.
     """
-    list_display = ('nombre', 'fecha_inicio', 'fecha_fin', 'estado')
+    list_display = ('nombre', 'fecha_inicio', 'fecha_fin', 'estado', 'asiento_cierre', 'asiento_apertura_siguiente')
     list_filter = ('estado',)
-    # Permite al Admin cambiar el estado (Abrir/Cerrar) desde la lista
-    list_editable = ('estado',)
+    # --- CAMBIO: list_editable se quita para forzar el uso de la vista personalizada ---
+    # list_editable = ('estado',) 
     search_fields = ('nombre',)
+    
+    # --- NUEVO: Hacemos los campos de estado y asientos solo de lectura ---
+    readonly_fields = ('estado', 'asiento_cierre', 'asiento_apertura_siguiente')
     
     # Solo el superusuario (Admin) debe poder gestionar períodos
     def has_module_permission(self, request):
@@ -46,12 +49,15 @@ class PeriodoContableAdmin(admin.ModelAdmin):
         return request.user.is_superuser
 
     def has_add_permission(self, request):
+        # Permitimos añadir desde el admin por si acaso, aunque la vista lo manejará
         return request.user.is_superuser
 
     def has_change_permission(self, request, obj=None):
+        # Cambiar SÍ, pero los campos clave son readonly
         return request.user.is_superuser
 
     def has_delete_permission(self, request, obj=None):
+        # No deberíamos permitir borrar períodos con asientos
         return request.user.is_superuser
 
 
@@ -68,6 +74,12 @@ class MovimientoInline(admin.TabularInline):
     
     # Campos a mostrar en la línea
     fields = ('cuenta', 'debe', 'haber')
+    
+    # --- NUEVO: Hacer que los asientos automáticos no se puedan editar ---
+    def get_readonly_fields(self, request, obj=None):
+        if obj and obj.es_asiento_automatico:
+            return ('cuenta', 'debe', 'haber')
+        return ()
 
 @admin.register(AsientoDiario)
 class AsientoDiarioAdmin(admin.ModelAdmin):
@@ -77,11 +89,11 @@ class AsientoDiarioAdmin(admin.ModelAdmin):
     
     # --- Configuración del formulario de edición ---
     inlines = [MovimientoInline] # ¡La magia! Incrusta los movimientos
-    fields = ('periodo', 'fecha', 'descripcion', ('numero_partida', 'creado_por', 'creado_en'))
+    fields = ('periodo', 'fecha', 'descripcion', ('numero_partida', 'creado_por', 'creado_en', 'es_asiento_automatico'))
     autocomplete_fields = ('periodo',)
     
     # Campos que no se pueden editar manualmente
-    readonly_fields = ('numero_partida', 'creado_por', 'creado_en')
+    readonly_fields = ('numero_partida', 'creado_por', 'creado_en', 'es_asiento_automatico')
 
     # --- Configuración de la lista de asientos ---
     list_display = (
@@ -91,9 +103,10 @@ class AsientoDiarioAdmin(admin.ModelAdmin):
         'descripcion_corta', 
         'total_debe', 
         'total_haber',
-        'estado_partida' # Columna personalizada
+        'estado_partida', # Columna personalizada
+        'es_asiento_automatico', # Nuevo
     )
-    list_filter = ('periodo', 'fecha', 'creado_por')
+    list_filter = ('periodo', 'fecha', 'creado_por', 'es_asiento_automatico') # Nuevo
     search_fields = ('numero_partida', 'descripcion')
     date_hierarchy = 'fecha'
 
@@ -105,6 +118,8 @@ class AsientoDiarioAdmin(admin.ModelAdmin):
 
     @admin.display(description='Estado', ordering='total_debe') # Permite ordenar por aquí
     def estado_partida(self, obj):
+        if obj.es_asiento_automatico:
+            return "🤖 Automático"
         if obj.esta_cuadrado and obj.total_debe > 0:
             return "✅ Cuadrado"
         elif obj.total_debe == 0 and obj.total_haber == 0:
@@ -143,10 +158,23 @@ class AsientoDiarioAdmin(admin.ModelAdmin):
                 f"(Debe: {asiento.total_debe}, Haber: {asiento.total_haber})",
                 level='WARNING'
             )
-        elif asiento.total_debe == 0:
+        elif asiento.total_debe == 0 and not asiento.es_asiento_automatico: # Permitir asientos automáticos vacíos si es necesario
             self.message_user(
                 request, 
                 f"Advertencia: La Partida N° {asiento.numero_partida} está VACÍA (total 0.00).",
                 level='WARNING'
             )
+            
+    # --- NUEVO: Proteger asientos automáticos ---
+    def get_readonly_fields(self, request, obj=None):
+        # Si el asiento es automático, hacerlo todo de solo lectura
+        if obj and obj.es_asiento_automatico:
+            return ('periodo', 'fecha', 'descripcion', 'numero_partida', 'creado_por', 'creado_en', 'es_asiento_automatico')
+        return self.readonly_fields
+
+    def has_delete_permission(self, request, obj=None):
+        # No permitir borrar asientos automáticos
+        if obj and obj.es_asiento_automatico:
+            return False
+        return super().has_delete_permission(request, obj)
 

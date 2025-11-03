@@ -135,7 +135,8 @@
                                 </a>
                             </li>
                             <li>
-                                <a href="{% url 'admin:contabilidad_periodocontable_changelist' %}" target="_blank" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
+                                <!-- MODIFICADO: Apunta a la nueva vista personalizada -->
+                                <a href="{% url 'contabilidad:gestionar_periodos' %}" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
                                     <ion-icon name="calendar-outline" class="text-xl"></ion-icon>
                                     <span class="font-medium">Gestionar Períodos</span>
                                 </a>
@@ -149,7 +150,8 @@
                                 </a>
                             </li>
                             <li>
-                                <a href="{% url 'contabilidad:ver_periodos' %}" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
+                                <!-- MODIFICADO: Apunta a la nueva vista personalizada -->
+                                <a href="{% url 'contabilidad:gestionar_periodos' %}" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
                                     <ion-icon name="calendar-outline" class="text-xl"></ion-icon>
                                     <span class="font-medium">Gestionar Períodos</span>
                                 </a>

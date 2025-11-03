@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}Gestionar Períodos - SoftNova SIC{% endblock %}
+
+{% block page_title %}Gestionar Períodos Contables{% endblock %}
+
+{% block content %}
+
+{% load auth_extras %} <!-- Cargar nuestro tag de roles -->
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    
+    <!-- Columna de Lista de Períodos -->
+    <div class="md:col-span-2 bg-white p-6 rounded-lg shadow-md">
+        <h3 class="text-xl font-semibold text-sic-darkest-blue mb-4">Historial de Períodos</h3>
+        
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre del Período</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rango de Fechas</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                        <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acción</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for periodo in periodos %}
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ periodo.nombre }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ periodo.fecha_inicio|date:"d/m/Y" }} - {{ periodo.fecha_fin|date:"d/m/Y" }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            {% if periodo.estado == "ABIERTO" %}
+                                <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                    <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                                    Abierto
+                                </span>
+                            {% else %}
+                                <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                    <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" clip-rule="evenodd"></path></svg>
+                                    Cerrado
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-center">
+                            <!-- Esta acción solo es visible para el Administrador -->
+                            {% if periodo.estado == "ABIERTO" and user|has_group:"Administrador" %}
+                                <!-- Formulario para el botón de Cerrar -->
+                                <form action="{% url 'contabilidad:cerrar_periodo' periodo.id %}" method="POST"
+                                      onsubmit="return confirm('¿Estás SEGURO de que quieres cerrar el período {{ periodo.nombre }}?\n\nEsta acción es IRREVERSIBLE.\n\nEl sistema generará los asientos de cierre y apertura automáticamente. Los saldos serán transferidos al próximo período.');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-colors duration-200">
+                                        Cerrar Período
+                                    </button>
+                                </form>
+                            {% elif periodo.estado == "CERRADO" %}
+                                <span class="text-gray-400 text-xs italic">Finalizado</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="px-6 py-4 text-center text-gray-500">No hay períodos registrados.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Columna de Acciones (Solo visible para Administrador) -->
+    {% if user|has_group:"Administrador" %}
+    <div class="md:col-span-1">
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h3 class="text-xl font-semibold text-sic-darkest-blue mb-4">Acciones de Admin</h3>
+            
+            {% if periodo_abierto %}
+                <!-- Si hay un período abierto, se debe cerrar primero -->
+                <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-md" role="alert">
+                    <p class="font-bold">Período Abierto Detectado</p>
+                    <p>El período <strong>{{ periodo_abierto.nombre }}</strong> está actualmente abierto. Debe cerrarlo para poder crear el siguiente.</p>
+                </div>
+            {% else %}
+                <!-- Si NO hay período abierto, se puede crear el siguiente -->
+                <p class="text-gray-600 mb-4">No hay ningún período abierto. El sistema creará el próximo período contable automáticamente.</p>
+                <form action="{% url 'contabilidad:gestionar_periodos' %}" method="POST">
+                    {% csrf_token %}
+                    <button type="submit" class="w-full bg-sic-primary hover:bg-sic-secondary text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-colors duration-200">
+                        {% if periodos.count > 0 %}
+                            Crear Próximo Período
+                        {% else %}
+                            Crear Período Inicial
+                        {% endif %}
+                    </button>
+                </form>
+                <p class="text-xs text-gray-500 mt-2">Esto creará un período para el mes siguiente al último período cerrado (o el mes actual si es el primero).</p>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}
+
