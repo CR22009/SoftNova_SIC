@@ -1,0 +1,220 @@
+{% load auth_extras %} <!-- Carga nuestro filtro de roles personalizado -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}SoftNova SIC{% endblock %}</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Configuración personalizada de Tailwind -->
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              // Paleta de colores personalizada para SoftNova_SIC
+              'sic-dark-blue': '#000B58',
+              'sic-medium-blue': '#003161',
+              'sic-teal': '#006A67', // sic-primary
+              'sic-light-teal': '#3B9797', // sic-secondary
+            }
+          }
+        }
+      }
+    </script>
+
+    <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+
+    <style>
+      /* Estilo para la barra de scroll */
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-thumb { background: #006A67; border-radius: 4px; }
+      ::-webkit-scrollbar-track { background: #f1f1f1; }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans antialiased">
+    
+    <div class="flex h-screen">
+        
+        <!-- === Sidebar (Menú Lateral) === -->
+        <aside class="w-64 bg-sic-dark-blue text-white flex flex-col fixed h-full shadow-lg">
+            
+            <div class="h-20 flex items-center justify-center bg-sic-medium-blue shadow-md">
+                <h1 class="text-2xl font-bold tracking-wider">SoftNova SIC</h1>
+            </div>
+            
+            <nav class="flex-1 overflow-y-auto py-6">
+                <ul class="space-y-1">
+                    <!-- Dashboard (Todos los roles) -->
+                    <li>
+                        <a href="{% url 'contabilidad:dashboard' %}" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
+                            <ion-icon name="grid-outline" class="text-xl"></ion-icon>
+                            <span class="font-medium">Dashboard</span>
+                        </a>
+                    </li>
+                    
+                    <!-- --- Grupo: Módulos --- -->
+                    <li class="px-6 pt-4 pb-2">
+                        <span class="text-xs uppercase text-gray-400 font-semibold tracking-wider">Módulos</span>
+                    </li>
+                    
+                    <!-- Administrador y Contador -->
+                    {% if user|has_group:"Administrador" or user|has_group:"Contador" %}
+                    <li>
+                        <a href="{% url 'contabilidad:registrar_asiento' %}" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
+                            <ion-icon name="create-outline" class="text-xl"></ion-icon>
+                            <span class="font-medium">Registro de Transacciones</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'contabilidad:mayor_seleccion' %}" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
+                            <ion-icon name="book-outline" class="text-xl"></ion-icon>
+                            <span class="font-medium">Libro Mayor</span>
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    <!-- Administrador e Informático -->
+                    {% if user|has_group:"Administrador" or user|has_group:"Informático" %}
+                    <li>
+                        <a href="{% url 'contabilidad:costeo' %}" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
+                            <ion-icon name="calculator-outline" class="text-xl"></ion-icon>
+                            <span class="font-medium">Costeo de Software</span>
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    <!-- --- Grupo: Estados Financieros --- -->
+                    <!-- Administrador y Contador -->
+                    {% if user|has_group:"Administrador" or user|has_group:"Contador" %}
+                    <li class="px-6 pt-4 pb-2">
+                        <span class="text-xs uppercase text-gray-400 font-semibold tracking-wider">Estados Financieros</span>
+                    </li>
+                    <li>
+                        <a href="{% url 'contabilidad:hub_estado_resultados' %}" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
+                            <ion-icon name="document-text-outline" class="text-xl"></ion-icon>
+                            <span class="font-medium">Estado de Resultados</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'contabilidad:hub_balance_general' %}" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
+                            <ion-icon name="stats-chart-outline" class="text-xl"></ion-icon>
+                            <span class="font-medium">Balance General</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'contabilidad:hub_flujo_efectivo' %}" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
+                            <ion-icon name="cash-outline" class="text-xl"></ion-icon>
+                            <span class="font-medium">Flujo de Efectivo</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'contabilidad:hub_estado_patrimonio' %}" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-medium-blue hover:text-white transition-colors duration-200">
+                            <ion-icon name="trending-up-outline" class="text-xl"></ion-icon>
+                            <span class="font-medium">Estado de Patrimonio</span>
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    <!-- --- Grupo: Configuración (con lógica de roles) --- -->
+                    <!-- Administrador y Contador -->
+                    {% if user|has_group:"Administrador" or user|has_group:"Contador" %}
+                    <li class="px-6 pt-4 pb-2">
+                        <span class="text-xs uppercase text-gray-400 font-semibold tracking-wider">Configuración</span>
+                    </li>
+                    
+                    <!-- MODIFICADO: Ambos roles apuntan a la nueva vista 'gestionar_catalogo' -->
+                    <li>
+                        <a href="{% url 'contabilidad:gestionar_catalogo' %}" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-dark-blue hover:text-white transition-colors duration-200">
+                            <ion-icon name="library-outline" class="text-xl"></ion-icon>
+                            <span class="font-medium">Catálogo de Cuentas</span>
+                        </a>
+                    </li>
+                    
+                    <!-- MODIFICADO: Ambos roles apuntan a la vista 'gestionar_periodos' -->
+                    <li>
+                        <a href="{% url 'contabilidad:gestionar_periodos' %}" class="flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-sic-dark-blue hover:text-white transition-colors duration-200">
+                            <ion-icon name="calendar-outline" class="text-xl"></ion-icon>
+                            <span class="font-medium">Gestionar Períodos</span>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            
+            <!-- Footer del Sidebar (Usuario, Salir) -->
+            <div class="h-16 p-4 flex items-center justify-between bg-sic-medium-blue shadow-inner">
+                <div class="flex items-center space-x-2 truncate">
+                    <ion-icon name="person-circle-outline" class="text-3xl text-sic-light-teal flex-shrink-0"></ion-icon>
+                    <div class="truncate">
+                        <span classs="text-sm font-medium truncate">{% if user.is_authenticated %}{{ user.username }}{% else %}Usuario{% endif %}</span>
+                        <!-- Muestra el primer grupo al que pertenece -->
+                        <span class="text-xs text-gray-400 block truncate">{% if user.groups.all.0 %}{{ user.groups.all.0.name }}{% endif %}</span>
+                    </div>
+                </div>
+                <!-- Botón de Cerrar Sesión -->
+                <a href="{% url 'contabilidad:logout' %}" title="Cerrar Sesión">
+                    <ion-icon name="log-out-outline" class="text-2xl text-gray-400 hover:text-white"></ion-icon>
+                </a>
+            </div>
+        </aside>
+
+        <!-- === Área de Contenido Principal === -->
+        <main class="flex-1 ml-64 h-screen overflow-y-auto">
+            
+            <!-- Header Superior -->
+            <header class="h-20 bg-white shadow-sm flex items-center justify-between px-8 border-b border-gray-200">
+                <div>
+                    <h2 class="text-2xl font-semibold text-gray-800">
+                        {% block page_title %}Dashboard{% endblock %}
+                    </h2>
+                </div>
+                <div>
+                    <!-- Acciones rápidas (Solo para Admin/Contador) -->
+                    {% if user|has_group:"Administrador" or user|has_group:"Contador" %}
+                    <a href="{% url 'contabilidad:registrar_asiento' %}" class="bg-sic-teal hover:bg-sic-light-teal text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-colors duration-200 flex items-center space-x-2">
+                        <ion-icon name="add-outline" class="text-xl"></ion-icon>
+                        <span>Nuevo Asiento</span>
+                    </a>
+                    {% endif %}
+                </div>
+            </header>
+            
+            <!-- Mensajes del Sistema (Django Messages Framework) -->
+            {% if messages %}
+                <div class="px-8 pt-4">
+                {% for message in messages %}
+                    <div class="relative px-4 py-3 rounded-lg shadow-md 
+                        {% if message.tags == 'success' %} bg-green-100 border border-green-400 text-green-700 
+                        {% elif message.tags == 'error' %} bg-red-100 border border-red-400 text-red-700 
+                        {% else %} bg-blue-100 border border-blue-400 text-blue-700 
+                        {% endif %}"
+                         role="alert">
+                        <span class="block sm:inline">{{ message }}</span>
+                    </div>
+                {% endfor %}
+                </div>
+            {% endif %}
+
+            <!-- Contenido Específico de la Página -->
+            <div class="p-8">
+                {% block content %}
+                <!-- El contenido de cada página irá aquí -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h3 class="text-lg font-semibold text-gray-700">Bienvenido al Sistema de Contabilidad</h3>
+                    <p class="text-gray-600 mt-2">
+                        Este es el área de contenido principal. Selecciona un módulo del menú lateral para comenzar.
+                    </D>
+                </div>
+                {% endblock %}
+            </div>
+
+        </main>
+    </div>
+
+</body>
+</html>
+
