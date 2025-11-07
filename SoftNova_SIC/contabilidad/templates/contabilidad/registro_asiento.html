@@ -1,0 +1,369 @@
+{% extends 'base.html' %}
+
+{% block title %}Registro de Asiento{% endblock %}
+{% block page_title %}Registrar Nuevo Asiento Diario{% endblock %}
+
+{% block content %}
+<form method="POST" id="asientoForm">
+    {% csrf_token %}
+    
+    <!-- Bloque 1: Encabezado del Asiento -->
+    <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+        <h3 class="text-xl font-semibold text-sic-dark-blue mb-4">1. Encabezado del Asiento</h3>
+        
+        <!-- Errores no ligados al formulario (ej. descuadre) -->
+        {% if form.non_field_errors or movimiento_formset.non_field_errors or messages %}
+        <div class="mb-4 space-y-2">
+            {% for message in messages %}
+             <div class="{% if message.tags == 'success' %} bg-green-100 border-green-400 text-green-700 {% elif message.tags == 'error' %} bg-red-100 border-red-400 text-red-700 {% else %} bg-blue-100 border-blue-400 text-blue-700 {% endif %} border px-4 py-3 rounded-md" role="alert">
+                <strong class="font-bold">{% if message.tags == 'error' %}Error:{% elif message.tags == 'success' %}Éxito:{% else %}Info:{% endif %}</strong>
+                <span class="block sm:inline">{{ message }}</span>
+             </div>
+            {% endfor %}
+
+            {% for error in asiento_form.non_field_errors %}
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md" role="alert">
+                <strong class="font-bold">Error:</strong> {{ error }}
+            </div>
+            {% endfor %}
+            {% for error in movimiento_formset.non_field_errors %}
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md" role="alert">
+                <strong class="font-bold">Error:</strong> {{ error }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-6">
+            <!-- Fecha -->
+            <div class="md:col-span-1">
+                <label for="{{ asiento_form.fecha.id_for_label }}" class="block text-sm font-medium text-gray-700">Fecha</label>
+                {{ asiento_form.fecha }}
+                {% if asiento_form.fecha.errors %}
+                <p class="text-red-500 text-xs mt-1">{{ asiento_form.fecha.errors.0 }}</p>
+                {% endif %}
+            </div>
+            <!-- Período -->
+            <div class="md:col-span-1">
+                <label for="{{ asiento_form.periodo.id_for_label }}" class="block text-sm font-medium text-gray-700">Período Contable</label>
+                {{ asiento_form.periodo }}
+                {% if asiento_form.periodo.errors %}
+                <p class="text-red-500 text-xs mt-1">{{ asiento_form.periodo.errors.0 }}</p>
+                {% endif %}
+            </div>
+            <!-- Descripción -->
+            <div class="md:col-span-2">
+                <label for="{{ asiento_form.descripcion.id_for_label }}" class="block text-sm font-medium text-gray-700">Descripción (Concepto)</label>
+                {{ asiento_form.descripcion }}
+                {% if asiento_form.descripcion.errors %}
+                <p class="text-red-500 text-xs mt-1">{{ asiento_form.descripcion.errors.0 }}</p>
+                {% endif %}
+            </div>
+            <!-- Plantilla de Transacción -->
+            <div class="md:col-span-1">
+                <label for="etiqueta-transaccion" class="block text-sm font-medium text-gray-700">Plantilla (Opcional)</label>
+                <select id="etiqueta-transaccion" class="block w-full mt-1 rounded-md border-gray-300 shadow-sm focus:border-sic-teal focus:ring-sic-teal">
+                    <option value="">-- Cargar plantilla --</option>
+                    <option value="venta_software">Venta de Software (IVA)</option>
+                    <option value="pago_salarios">Pago de Salarios</option>
+                    <option value="compra_equipo">Compra de Equipo (IVA)</option>
+                    <option value="pago_alquiler">Pago de Alquiler (IVA)</option>
+                    <!-- Añadir más plantillas aquí -->
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bloque 2: Movimientos (Formset) -->
+    <div class="bg-white p-6 rounded-lg shadow-md">
+        <h3 class="text-xl font-semibold text-sic-dark-blue mb-4">2. Movimientos (Partida Doble)</h3>
+        
+        <!-- El Management Form es OBLIGATORIO para que el Formset funcione -->
+        {{ movimiento_formset.management_form }}
+        
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-lg">
+                <!-- Encabezados de la tabla -->
+                <thead>
+                    <tr class="border-b-2 border-gray-300">
+                        <th class="text-left text-sm font-semibold text-gray-600 p-3 w-5/12">Cuenta Contable</th>
+                        <th class="text-right text-sm font-semibold text-gray-600 p-3 w-3/12">Debe ($)</th>
+                        <th class="text-right text-sm font-semibold text-gray-600 p-3 w-3/12">Haber ($)</th>
+                        <th class="text-center text-sm font-semibold text-gray-600 p-3 w-1/12">Eliminar</th>
+                    </tr>
+                </thead>
+                <!-- Contenedor para las líneas de movimiento (JS) -->
+                <tbody id="movimiento-form-list">
+                    {% for form in movimiento_formset %}
+                    <tr class="movimiento-form border-b border-gray-200">
+                        {{ form.id }} {# Campo oculto ID del movimiento #}
+                        <td class="p-2">{{ form.cuenta }}</td>
+                        <td class="p-2">{{ form.debe }}</td>
+                        <td class="p-2">{{ form.haber }}</td>
+                        <td class="p-2 text-center">
+                            {% if form.instance.pk %}
+                                {{ form.DELETE }}
+                            {% else %}
+                                <button type="button" class="remove-movimiento-form text-red-500 hover:text-red-700 text-2xl" title="Eliminar línea">&times;</button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <!-- Errores por línea -->
+                    {% if form.errors %}
+                    <tr class="bg-red-50">
+                        <td colspan="4" class="p-2 text-red-600 text-sm">
+                            {% for field, error in form.errors.items %}
+                                {{ field }}: {{ error.0 }} 
+                            {% endfor %}
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+                <!-- Totales -->
+                <tfoot class="bg-gray-100">
+                    <tr>
+                        <td class="p-3 text-right font-bold text-gray-700">TOTALES:</td>
+                        <td class="p-3 text-right">
+                            <input type="text" id="total-debe" class="w-full text-right bg-gray-200 rounded-md border-gray-300 font-bold" value="0.00" readonly>
+                        </td>
+                        <td class="p-3 text-right">
+                            <input type="text" id="total-haber" class="w-full text-right bg-gray-200 rounded-md border-gray-300 font-bold" value="0.00" readonly>
+                        </td>
+                        <td class="p-3"></td>
+                    </tr>
+                    <tr>
+                        <td class="p-3 text-right font-bold text-gray-700">DIFERENCIA:</td>
+                        <td colspan="2" class="p-3">
+                            <input type="text" id="diferencia" class="w-full text-center bg-gray-200 rounded-md border-gray-300 font-bold text-red-600" value="0.00" readonly>
+                        </td>
+                        <td class="p-3"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <!-- Botón para añadir más líneas (JS) -->
+        <div class="mt-4">
+            <button type="button" id="add-movimiento-form" class="bg-sic-light-teal hover:bg-sic-teal text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-colors duration-200">
+                + Añadir Línea
+            </button>
+        </div>
+    </div>
+    
+    <!-- Bloque 3: Acciones -->
+    <div class="mt-6 flex justify-end space-x-4">
+        <a href="{% url 'contabilidad:dashboard' %}" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-5 rounded-lg">Cancelar</a>
+        <button type="submit" class="bg-sic-medium-blue hover:bg-sic-dark-blue text-white font-bold py-2 px-6 rounded-lg shadow-md transition-colors duration-200">
+            Guardar Asiento
+        </button>
+    </div>
+</form>
+
+<!-- Plantilla para el formulario vacío de JS (Oculto) -->
+<table class="hidden">
+    <tbody id="empty-form-template">
+        <!-- Esto es un hack. El .innerHTML de un <tbody> es su contenido (el <tr>) -->
+        <tr class="movimiento-form border-b border-gray-200">
+            {{ movimiento_formset.empty_form.id }}
+            <td class="p-2">{{ movimiento_formset.empty_form.cuenta }}</td>
+            <td class="p-2">{{ movimiento_formset.empty_form.debe }}</td>
+            <td class="p-2">{{ movimiento_formset.empty_form.haber }}</td>
+            <td class="p-2 text-center">
+                <button type="button" class="remove-movimiento-form text-red-500 hover:text-red-700 text-2xl" title="Eliminar línea">&times;</button>
+            </td>
+        </tr>
+    </tbody>
+</table>
+<!-- Fin de la plantilla oculta -->
+
+
+<!-- JavaScript para Formsets Dinámicos, Cálculos y Plantillas -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // --- 1. Definición de Elementos y Plantillas ---
+    const formList = document.getElementById('movimiento-form-list');
+    const addButton = document.getElementById('add-movimiento-form');
+    const emptyFormTemplate = document.getElementById('empty-form-template').innerHTML; // Contiene el <tr>...</tr>
+    const totalFormsInput = document.getElementById('id_movimientos-TOTAL_FORMS');
+    
+    // Elementos para totales
+    const totalDebeEl = document.getElementById('total-debe');
+    const totalHaberEl = document.getElementById('total-haber');
+    const diferenciaEl = document.getElementById('diferencia');
+
+    // Elementos para plantillas (NUEVO)
+    const etiquetaSelect = document.getElementById('etiqueta-transaccion');
+    
+    // --- 2. Definición de Plantillas de Cuentas (NUEVO) ---
+    // Mapea la 'etiqueta' a una lista de CÓDIGOS de cuenta del catálogo
+    const presets = {
+        'venta_software': ['121', '41', '221'], // Clientes, Venta, IVA Débito
+        'pago_salarios': ['521', '232', '233', '113'], // Sueldos, AFP, ISSS, Banco
+        'compra_equipo': ['152', '141', '211'], // Equipo, IVA Crédito, Proveedores
+        'pago_alquiler': ['523', '141', '113'] // Alquiler, IVA Crédito, Banco
+    };
+
+    // Crear un mapa de 'CodigoCuenta' -> 'ID_del_Option' para pre-seleccionar (NUEVO)
+    // Esto se construye una vez al cargar la página
+    const cuentaOptionMap = new Map();
+    // Tomamos el primer select del formset (de la plantilla vacía) para leer las opciones
+    const templateSelect = document.querySelector("#empty-form-template select[name*='cuenta']");
+    if (templateSelect) {
+        templateSelect.querySelectorAll('option').forEach(opt => {
+            if (opt.value && opt.textContent) {
+                const codigo = opt.textContent.split(' - ')[0]; // "121 - Clientes Locales" -> "121"
+                if (codigo) {
+                    cuentaOptionMap.set(codigo, opt.value); // map['121'] = '5' (ID de la cuenta)
+                }
+            }
+        });
+    }
+
+    // --- 3. Funciones Auxiliares ---
+
+    /**
+     * Calcula y actualiza los totales (Debe, Haber, Diferencia)
+     */
+    function updateTotals() {
+        let totalDebe = 0;
+        let totalHaber = 0;
+        
+        document.querySelectorAll('.movimiento-form').forEach(function(row) {
+            // Asegurarse de no contar una fila marcada para eliminar (si aplica)
+            const deleteInput = row.querySelector("input[name*='DELETE']");
+            if (deleteInput && deleteInput.checked) {
+                return; // No sumar esta fila
+            }
+
+            let debeInput = row.querySelector('.debe-input');
+            let haberInput = row.querySelector('.haber-input');
+            
+            if (debeInput && haberInput) {
+                totalDebe += parseFloat(debeInput.value) || 0;
+                totalHaber += parseFloat(haberInput.value) || 0;
+            }
+        });
+
+        totalDebeEl.value = totalDebe.toFixed(2);
+        totalHaberEl.value = totalHaber.toFixed(2);
+        
+        let diferencia = totalDebe - totalHaber;
+        diferenciaEl.value = diferencia.toFixed(2);
+        
+        if (diferencia.toFixed(2) === '0.00' || diferencia.toFixed(2) === '-0.00') {
+            diferenciaEl.classList.remove('text-red-600');
+            diferenciaEl.classList.add('text-green-600');
+        } else {
+            diferenciaEl.classList.remove('text-green-600');
+            diferenciaEl.classList.add('text-red-600');
+        }
+    }
+
+    /**
+     * Adjunta los listeners de 'input' a una fila específica
+     */
+    function attachListenersToRow(row) {
+        row.querySelectorAll('.debe-input, .haber-input').forEach(function(input) {
+            input.addEventListener('input', updateTotals);
+        });
+
+        // Listener para el botón de eliminar de esta fila específica
+        const removeButton = row.querySelector('.remove-movimiento-form');
+        if (removeButton) {
+            removeButton.addEventListener('click', function(e) {
+                e.preventDefault();
+                // Encontrar la fila (TR) padre y eliminarla
+                let row = e.target.closest('.movimiento-form');
+                if (row) {
+                    row.remove();
+                    updateTotals();
+                    // Nota: No es necesario decrementar TOTAL_FORMS
+                    // El management form maneja las filas faltantes
+                }
+            });
+        }
+    }
+
+    /**
+     * Añade una nueva fila de movimiento al formulario (CORREGIDO y MEJORADO)
+     * Opcionalmente pre-selecciona una cuenta.
+     */
+    function addNewMovimientoForm(cuentaId = null) {
+        let formIndex = parseInt(totalFormsInput.value);
+        
+        // 1. Crear el HTML de la nueva fila reemplazando el prefijo
+        let newFormHTML = emptyFormTemplate.replace(/__prefix__/g, formIndex);
+        
+        // 2. CORRECCIÓN: Insertar el HTML al final del tbody
+        formList.insertAdjacentHTML('beforeend', newFormHTML);
+        
+        // 3. Obtener la fila que acabamos de insertar
+        let newRow = formList.lastElementChild;
+
+        // 4. Pre-seleccionar la cuenta si se proporcionó un ID (NUEVO)
+        if (cuentaId) {
+            const select = newRow.querySelector("select[name*='cuenta']");
+            if (select) {
+                select.value = cuentaId;
+            }
+        }
+        
+        // 5. Actualizar el contador TOTAL_FORMS
+        totalFormsInput.value = formIndex + 1;
+        
+        // 6. Adjuntar listeners a los inputs de esta nueva fila
+        attachListenersToRow(newRow);
+    }
+
+    // --- 4. Event Listeners Principales ---
+
+    // (CORREGIDO) Listener para el botón "+ Añadir Línea"
+    addButton.addEventListener('click', function() {
+        addNewMovimientoForm();
+        updateTotals();
+    });
+
+    // (NUEVO) Listener para las Plantillas de Transacción
+    etiquetaSelect.addEventListener('change', function(e) {
+        const tag = e.target.value;
+        if (!tag || !presets[tag]) {
+            return; // No hacer nada si no hay tag o preset
+        }
+
+        const cuentas = presets[tag]; // Ej. ['121', '41', '221']
+
+        // 1. Limpiar todas las filas existentes
+        formList.innerHTML = '';
+        totalFormsInput.value = '0'; // Reiniciar contador
+
+        // 2. Añadir las nuevas filas basadas en la plantilla
+        cuentas.forEach(codigo => {
+            const cuentaId = cuentaOptionMap.get(codigo); // '121' -> '5'
+            if (cuentaId) {
+                addNewMovimientoForm(cuentaId);
+            } else {
+                console.warn(`No se encontró el ID para el código de cuenta: ${codigo}`);
+                addNewMovimientoForm(); // Añadir fila vacía
+            }
+        });
+
+        // 3. Resetear el select de plantilla
+        e.target.value = '';
+
+        // 4. Actualizar totales (quedarán en 0.00)
+        updateTotals();
+    });
+
+    // (DELEGADO) Listener para botones "Eliminar" (ahora en attachListenersToRow)
+    // Se mantiene el listener original para las filas cargadas por Django (si se edita)
+    formList.querySelectorAll('.movimiento-form').forEach(attachListenersToRow);
+
+    // Calcular totales al cargar la página por primera vez
+    updateTotals();
+});
+</script>
+{% endblock %}
+

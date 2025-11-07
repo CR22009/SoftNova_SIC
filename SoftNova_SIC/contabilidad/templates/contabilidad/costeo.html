@@ -1,0 +1,573 @@
+{% extends 'base.html' %}
+{% load static %} 
+{% block title %}Costeo de Sistemas{% endblock %}
+{% block page_title %}Costeo de Sistemas{% endblock %}
+
+{% block content %}
+<style>
+/* ... (Todos tus estilos CSS van aquí - sin cambios) ... */
+/* --- Contenedor Principal (La hoja blanca) --- */
+.content-wrapper {
+    background-color: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    padding: 24px 32px;
+}
+
+/* --- Secciones de Formulario (CIF, Salario, Costeo) --- */
+.form-section {
+    margin-bottom: 40px;
+}
+.form-section h3 {
+    font-size: 1.125rem; /* 18px */
+    font-weight: 600;
+    color: #111827;
+    margin-bottom: 4px;
+}
+.form-section p {
+    font-size: 0.875rem; /* 14px */
+    color: #6b7280;
+    margin: 0 0 16px 0;
+}
+
+/* * --- ESTILOS DE FORMULARIO MEJORADOS --- 
+ * Apuntan a <input> y <select> directamente
+ */
+.form-grid-layout input[type="text"],
+.form-grid-layout input[type="number"],
+.form-grid-layout select,
+.table-costeo input[type="text"],
+.table-costeo input[type="number"],
+.table-costeo select {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 0.875rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background-color: #fff;
+    box-sizing: border-box; 
+    font-family: 'Nunito', sans-serif;
+}
+
+.form-grid-layout input[type="checkbox"] {
+    /* Estilos para el checkbox de "Eliminar" */
+    height: 1.25rem;
+    width: 1.25rem;
+}
+
+.form-grid-layout input:focus,
+.form-grid-layout select:focus,
+.table-costeo input:focus,
+.table-costeo select:focus {
+    outline: none;
+    border-color: #059669;
+    box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.2);
+}
+/* Fin de estilos de formulario mejorados */
+
+
+/* --- Link para Guardar (Texto plano) --- */
+.save-link {
+    background: none;
+    border: none;
+    padding: 0;
+    color: #059669;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+    font-size: 0.875rem;
+    display: block;
+    margin-top: 12px;
+}
+.save-link:hover {
+    color: #047857;
+}
+
+/* --- GRID PARA CIF Y SALARIO --- */
+.form-grid-layout {
+    display: grid;
+    gap: 16px;
+    align-items: center;
+}
+
+.form-grid-header {
+    display: contents; 
+}
+.form-grid-header > div {
+    font-size: 0.75rem; /* 12px */
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    padding-bottom: 8px;
+}
+
+.form-grid-row {
+    display: contents; 
+}
+
+/* Columnas para el grid de CIF */
+.cif-grid {
+    grid-template-columns: 1.2fr 2fr 1.2fr 1.2fr 1fr 0.5fr;
+}
+.cif-grid .save-link {
+    grid-column: 4 / -1; 
+    justify-self: end;
+}
+
+/* Columnas para el grid de Salario */
+.salario-grid {
+    grid-template-columns: 1fr 2fr 1fr 1fr;
+}
+.salario-grid .save-link {
+    grid-column: 3 / -1;
+    justify-self: end;
+}
+
+/* --- TABLA DE COSTEO (Estilo limpio) --- */
+.table-costeo {
+    width: 100%;
+    border-collapse: collapse;
+}
+.table-costeo thead th {
+    font-size: 0.75rem; /* 12px */
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    text-align: left;
+    padding: 8px 4px;
+    border-bottom: 2px solid #e5e7eb;
+}
+.table-costeo tbody td {
+    padding: 8px 4px;
+    border-bottom: 1px solid #e5e7eb;
+    vertical-align: middle; /* Centra verticalmente los items */
+}
+.table-costeo .form-control,
+.table-costeo .form-select {
+    padding: 6px 8px; 
+    font-size: 0.875rem;
+}
+.table-separator-row td {
+    text-align: center;
+    font-weight: 600;
+    color: #6b7280;
+    background-color: #f4f7fa;
+}
+
+/* --- Estilos base (ya deben estar en base.html pero los pongo por si acaso) --- */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+.page-header h1 {
+    font-size: 1.875rem; /* 30px */
+    font-weight: 700;
+    margin: 0;
+    color: #111827;
+}
+.btn {
+    padding: 10px 16px;
+    font-size: 0.875rem; /* 14px */
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+}
+.btn-success {
+    background-color: #059669;
+    color: white;
+}
+.btn-success:hover {
+    background-color: #047857;
+}
+</style>
+
+<div class="content-wrapper">
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="form-section" style="background-color: {% if message.tags == 'error' %}#f8d7da{% else %}#d4edda{% endif %}; color: {% if message.tags == 'error' %}#721c24{% else %}#155724{% endif %}; padding: 15px; border-radius: 8px;">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-section">
+            <h3>Costos Indirectos de Fabricación (CIF)</h3>
+            <p>Edite los valores directamente y presione "Guardar".</p>
+
+            {{ cif_formset.management_form }}
+            
+            <div class="form-grid-layout cif-grid">
+            
+                <div class="form-grid-header">
+                    <div>Período</div>
+                    <div>CIF Específico (Nombre)</div>
+                    <div>Categoría</div>
+                    <div>Costo Anual Estimado (Editable)</div>
+                    <div>Factor (Calculado)</div>
+                    <div>¿Eliminar?</div>
+                </div>
+
+                {% for form in cif_formset %}
+                    <div class="form-grid-row">
+                        {{ form.id }}
+                        
+                        {# 🟢 CORRECCIÓN CLAVE: Aseguramos que los campos fijos se envíen como hidden inputs #}
+                        <input type="hidden" name="{{ form.prefix }}-periodo" value="{{ form.instance.periodo.id }}">
+                        <input type="hidden" name="{{ form.prefix }}-nombre" value="{{ form.instance.nombre }}">
+                        <input type="hidden" name="{{ form.prefix }}-categoria" value="{{ form.instance.categoria }}">
+                        
+                        {# Mostramos los valores como texto para el usuario #}
+                        <div>{{ form.instance.periodo.nombre }}</div>
+                        <div>{{ form.instance.nombre }}</div>
+                        <div>{{ form.instance.get_categoria_display }}</div>
+                        
+                        {# El único campo editable del Formulario de Django #}
+                        <div>{{ form.costo_anual_estimado }}</div>
+                        
+                        <div class="cif-factor-cell" 
+                             data-form-prefix="{{ form.prefix }}" 
+                             data-periodo-id="{% if form.instance.pk %}{{ form.instance.periodo.id }}{% else %}{% endif %}">
+                            {% if form.instance.pk %}
+                                {{ form.instance.factor|floatformat:10 }}
+                            {% else %}
+                                (se calculará)
+                            {% endif %}
+                        </div>
+                        
+                        <div style="text-align: center;">
+                            {% if form.instance.pk %}{{ form.DELETE }}{% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+
+                <button type="submit" name="submit_cif" class="save-link">Guardar Cambios en CIF</button>
+            </div>
+        </div>
+    </form>
+
+
+    <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 40px 0;">
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-section">
+            <h3>Configuración Salario MOD Anual</h3>
+            
+            {{ salario_formset.management_form }}
+
+            <div class="form-grid-layout salario-grid">
+                
+                <div class="form-grid-header">
+                    <div>Período</div>
+                    <div>Descripción</div>
+                    <div>Salario (Editable)</div>
+                    <div>MOD Unitario (Calculado)</div>
+                </div>
+
+                {% for form in salario_formset %}
+                    <div class="form-grid-row">
+                        {{ form.id }}
+                        
+                        <div>
+                        {% if form.instance.pk %}
+                            {{ form.instance.periodo.nombre }}
+                            <input type="hidden" name="{{ form.prefix }}-periodo" value="{{ form.instance.periodo.id }}">
+                        {% else %}
+                            {{ form.periodo }} 
+                        {% endif %}
+                        </div>
+                        
+                        <div>
+                        {% if form.instance.pk %}
+                            {{ form.instance.descripcion }}
+                            <input type="hidden" name="{{ form.prefix }}-descripcion" value="{{ form.instance.descripcion }}">
+                        {% else %}
+                            {{ form.descripcion }}
+                        {% endif %}
+                        </div>
+                        
+                        <div>{{ form.salario }}</div>
+                        
+                        <div class="salario-mod-cell" data-form-prefix="{{ form.prefix }}">
+                        {% if form.instance.pk %}
+                            $ {{ form.instance.mod_unitario|floatformat:4 }}
+                        {% else %}
+                            (se calculará)
+                        {% endif %}
+                        </div>
+
+                    </div>
+                {% endfor %}
+                <button type="submit" name="submit_salarios" class="save-link">Guardar Cambios de Salario</button>
+            </div>
+        </div>
+    </form>
+
+
+    <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 40px 0;">
+
+    <div class="form-section">
+        <h3>Costeo de Proyectos</h3>
+        
+        <div class="table-responsive">
+            <table class="table-costeo">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Período</th>
+                        <th>Descripción Proyecto</th>
+                        <th>MOD Unitario (Calc.)</th>
+                        <th>Horas Esfuerzo</th>
+                        <th>Factor Suma / 12 (Calc.)</th>
+                        <th>CIF (Calc.)</th>
+                        <th>Total (Calculado)</th>
+                        <th style="width: 120px;">Acción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        <tr>
+                            <td>(Nuevo)</td>
+                            <td>{{ costeo_form_nuevo.periodo }}</td>
+                            <td>{{ costeo_form_nuevo.descripcion_proyecto }}</td>
+                            
+                            <td id="nuevo_mod_unitario_cell">(auto)</td>
+                            
+                            <td>{{ costeo_form_nuevo.horas_esfuerzo }}</td>
+                            
+                            <td id="nuevo_factor_suma_cell">(auto)</td>
+                            
+                            <td id="nuevo_cif_cell">(auto)</td>
+                            
+                            <td id="nuevo_total_cell">(auto)</td>
+                            
+                            <td>
+                                <button type="submit" name="submit_costeo" class="btn btn-success" style="width: 100%; padding: 8px;">Agregar</button>
+                            </td>
+
+                            <td style="display: none;">
+                                {{ costeo_form_nuevo.cif }}
+                            </td>
+                        </tr>
+                        {% if costeo_form_nuevo.errors or costeo_form_nuevo.non_field_errors %}
+                        <tr>
+                            <td colspan="9" style="color: red; font-size: 0.8rem; padding: 10px;">
+                                <b>Error al agregar:</b>
+                                {% for error in costeo_form_nuevo.non_field_errors %} {{ error }} {% endfor %}
+                                {% for field in costeo_form_nuevo %}
+                                    {% for error in field.errors %} {{ field.label }}: {{ error }} {% endfor %}
+                                {% endfor %}
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </form>
+
+                    <tr class="table-separator-row">
+                        <td colspan="9">--- Proyectos Existentes ---</td>
+                    </tr>
+
+                    {% for costeo in lista_costeos_existentes %}
+                        <tr>
+                            <td>{{ costeo.idCosteo }}</td>
+                            <td>{{ costeo.periodo.nombre }}</td>
+                            <td>{{ costeo.descripcion_proyecto }}</td>
+                            <td>$ {{ costeo.mod_unitario|floatformat:4 }}</td>
+                            <td>{{ costeo.horas_esfuerzo|floatformat:2 }}</td>
+                            <td>{{ costeo.factor_suma|floatformat:10 }}</td>
+                            <td>$ {{ costeo.cif|floatformat:2 }}</td>
+                            <td><strong>$ {{ costeo.total|floatformat:2 }}</strong></td>
+                            <td></td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="9" style="text-align: center; padding: 20px; color: #6b7280;">
+                                No hay proyectos de costeo registrados.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div> 
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        
+        // --- CÁLCULO DE FACTOR (CIF) ---
+        // (Este código está correcto - sin cambios)
+        const salariosMap = JSON.parse('{{ salarios_json|escapejs|default:"{}" }}');
+        
+        const factorCells = document.querySelectorAll('.cif-factor-cell');
+        const cellMap = {};
+        factorCells.forEach(cell => {
+            const prefix = cell.dataset.formPrefix;
+            if (prefix) {
+                cellMap[prefix] = cell;
+            }
+        });
+
+        const costoInputs = document.querySelectorAll('input[name^="cif-"][name$="costo_anual_estimado"]');
+        costoInputs.forEach(input => {
+            function recalcularFactor() {
+                try {
+                    const costoEstimado = parseFloat(input.value) || 0;
+                    const nameParts = input.name.split('-');
+                    const prefix = `${nameParts[0]}-${nameParts[1]}`;
+                    const factorCell = cellMap[prefix];
+                    
+                    if (factorCell) {
+                        const periodoId = factorCell.dataset.periodoId;
+                        const salario = parseFloat(salariosMap[periodoId]) || 0;
+                        let nuevoFactor = 0;
+                        if (salario > 0) {
+                            nuevoFactor = costoEstimado / salario;
+                        }
+                        factorCell.innerText = nuevoFactor.toFixed(10);
+                    }
+                } catch (e) {
+                    console.error('Error al calcular el factor:', e);
+                }
+            }
+            input.addEventListener('input', recalcularFactor);
+            recalcularFactor();
+        });
+
+
+        // --- CÁLCULO DE MOD UNITARIO (SALARIO) ---
+        // (Este código JS también está correcto - sin cambios)
+        function calcularMODUnitario(salarioAnual) {
+             try {
+                const DIVISOR_SALARIO = 14.0;
+                const MESES_ANIO = 12.0;
+                const HORAS_SEMANA = 44.0;
+                const SEMANAS_ANIO = 52.0;
+                
+                const numerador = (salarioAnual / DIVISOR_SALARIO) / MESES_ANIO;
+                const denominador = (HORAS_SEMANA * SEMANAS_ANIO) / MESES_ANIO;
+                
+                if (denominador === 0) { return 0; }
+                const resultado = numerador / denominador;
+                return resultado;
+
+            } catch (e) {
+                console.error("Error en fórmula de MOD Unitario:", e);
+                return 0;
+            }
+        }
+        
+        const modCells = document.querySelectorAll('.salario-mod-cell');
+        const modCellMap = {};
+        modCells.forEach(cell => {
+            const prefix = cell.dataset.formPrefix;
+            if (prefix) {
+                modCellMap[prefix] = cell;
+            }
+        });
+
+        const salarioInputs = document.querySelectorAll('input[name^="salarios-"][name$="-salario"]');
+
+        salarioInputs.forEach(input => {
+            function recalcularMOD() {
+                try {
+                    const salarioAnual = parseFloat(input.value) || 0;
+                    const nameParts = input.name.split('-');
+                    const prefix = `${nameParts[0]}-${nameParts[1]}`;
+                    const modCell = modCellMap[prefix];
+
+                    if (modCell) {
+                        const nuevoMOD = calcularMODUnitario(salarioAnual);
+                        if (modCell.innerText.includes('$') || salarioAnual > 0) {
+                            modCell.innerText = `$ ${nuevoMOD.toFixed(4)}`;
+                        } else {
+                            if(salarioAnual === 0) {
+                                modCell.innerText = "(se calculará)";
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error al calcular el MOD Unitario:', e);
+                }
+            }
+            input.addEventListener('input', recalcularMOD);
+        });
+
+
+        // --- **** INICIO DE LA LÓGICA RESTAURADA **** ---
+        // --- ACTUALIZAR CÁLCULO EN VIVO DE "NUEVO PROYECTO" ---
+
+        // 1. Cargar los mapas de datos que pasamos desde la vista
+        const modUnitarioMap = JSON.parse('{{ mod_unitario_json|escapejs|default:"{}" }}');
+        const factorSumaMap = JSON.parse('{{ factor_suma_json|escapejs|default:"{}" }}');
+        
+        // 2. Encontrar todos los elementos (inputs y celdas)
+        //    (Estos selectores buscan los campos generados por {{ costeo_form_nuevo... }})
+        const periodoSelect = document.querySelector('select[name="costeo-periodo"]');
+        const horasEsfuerzoInput = document.querySelector('input[name="costeo-horas_esfuerzo"]');
+        const cifInputOculto = document.querySelector('input[name="costeo-cif"]'); // <-- El input oculto
+        
+        const modUnitarioCell = document.getElementById('nuevo_mod_unitario_cell');
+        const factorSumaCell = document.getElementById('nuevo_factor_suma_cell');
+        const cifCell = document.getElementById('nuevo_cif_cell');         // <-- Celda CIF
+        const totalCell = document.getElementById('nuevo_total_cell');       // <-- Celda Total
+
+        // 3. Verificar que TODOS los elementos existan antes de continuar
+        if (periodoSelect && horasEsfuerzoInput && cifInputOculto && modUnitarioCell && factorSumaCell && cifCell && totalCell) {
+            
+            // 4. Crear la función que recalcula TODO
+            function recalcularFilaNuevoCosteo() {
+                try {
+                    // --- A. Obtener valores de los inputs ---
+                    const selectedPeriodoId = periodoSelect.value;
+                    const horas_esfuerzo = parseFloat(horasEsfuerzoInput.value) || 0;
+                    
+                    // --- B. Obtener valores de los mapas ---
+                    const mod_unitario = parseFloat(modUnitarioMap[selectedPeriodoId]) || 0;
+                    const factor_suma = parseFloat(factorSumaMap[selectedPeriodoId]) || 0;
+
+                    // --- C. Realizar los cálculos ---
+                    const mod_total = horas_esfuerzo * mod_unitario;
+                    
+                    // Esta es tu fórmula: (horas * mod_unitario) * factor_suma
+                    const cif_calculado = mod_total * factor_suma; 
+                    
+                    const total_calculado = mod_total + cif_calculado;
+
+                    // --- D. Actualizar las celdas <td> (visual) ---
+                    modUnitarioCell.innerText = (mod_unitario > 0) ? `$ ${mod_unitario.toFixed(4)}` : '(auto)';
+                    factorSumaCell.innerText = (factor_suma > 0) ? factor_suma.toFixed(10) : '(auto)';
+                    cifCell.innerText = `$ ${cif_calculado.toFixed(2)}`;
+                    totalCell.innerText = `$ ${total_calculado.toFixed(2)}`;
+
+                    // --- E. Actualizar el input oculto (para el POST) ---
+                    cifInputOculto.value = cif_calculado.toFixed(2);
+
+                } catch (e) {
+                    console.error("Error al recalcular la fila de costeo:", e);
+                }
+            }
+
+            // 5. Escuchar eventos en el <select> de Período Y en el <input> de Horas
+            periodoSelect.addEventListener('change', recalcularFilaNuevoCosteo);
+            horasEsfuerzoInput.addEventListener('input', recalcularFilaNuevoCosteo);
+            
+            // 6. Ejecutar la función una vez al cargar la página
+            //    (para que calcule los valores iniciales si el form se recarga con datos)
+            recalcularFilaNuevoCosteo();
+        }
+        
+        // --- **** FIN DE LA LÓGICA RESTAURADA **** ---
+
+    });
+</script>
+{% endblock %}

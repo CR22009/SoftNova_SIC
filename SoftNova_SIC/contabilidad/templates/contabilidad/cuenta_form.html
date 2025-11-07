@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+{% load auth_extras %}
+
+{% block title %}{{ titulo }}{% endblock %}
+{% block page_title %}{{ titulo }}{% endblock %}
+
+{% block header_action %}
+    <a href="{% url 'contabilidad:gestionar_catalogo' %}" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg shadow-md transition-colors duration-200 flex items-center space-x-2">
+        <ion-icon name="arrow-back-outline" class="text-xl"></ion-icon>
+        <span>Volver al Catálogo</span>
+    </a>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md">
+    
+    <form method="POST">
+        {% csrf_token %}
+        
+        <div class="space-y-6">
+            
+            <!-- Errores Generales del Formulario -->
+            {% if form.non_field_errors %}
+                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md">
+                    {% for error in form.non_field_errors %}
+                        <p>{{ error }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <!-- Campo: Código -->
+            <div>
+                <label for="{{ form.codigo.id_for_label }}" class="block text-sm font-medium text-gray-700">Código de Cuenta</label>
+                {{ form.codigo }}
+                {% if form.codigo.errors %}
+                    <p class="text-sm text-red-600 mt-1">{{ form.codigo.errors|first }}</p>
+                {% endif %}
+            </div>
+            
+            <!-- Campo: Nombre -->
+            <div>
+                <label for="{{ form.nombre.id_for_label }}" class="block text-sm font-medium text-gray-700">Nombre de la Cuenta</label>
+                {{ form.nombre }}
+                {% if form.nombre.errors %}
+                    <p class="text-sm text-red-600 mt-1">{{ form.nombre.errors|first }}</p>
+                {% endif %}
+            </div>
+            
+            <!-- Campo: Padre -->
+            <div>
+                <label for="{{ form.padre.id_for_label }}" class="block text-sm font-medium text-gray-700">Cuenta Padre (Grupo)</label>
+                {{ form.padre }}
+                <p class="text-xs text-gray-500 mt-1">Dejar en blanco si es una cuenta de Nivel 1 (ej. Activo, Pasivo).</p>
+                {% if form.padre.errors %}
+                    <p class="text-sm text-red-600 mt-1">{{ form.padre.errors|first }}</p>
+                {% endif %}
+            </div>
+            
+            <hr>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Campo: Tipo de Cuenta -->
+                <div>
+                    <label for="{{ form.tipo_cuenta.id_for_label }}" class="block text-sm font-medium text-gray-700">Tipo de Cuenta</label>
+                    {{ form.tipo_cuenta }}
+                    {% if form.tipo_cuenta.errors %}
+                        <p class="text-sm text-red-600 mt-1">{{ form.tipo_cuenta.errors|first }}</p>
+                    {% endif %}
+                </div>
+                
+                <!-- Campo: Naturaleza -->
+                <div>
+                    <label for="{{ form.naturaleza.id_for_label }}" class="block text-sm font-medium text-gray-700">Naturaleza</label>
+                    {{ form.naturaleza }}
+                    {% if form.naturaleza.errors %}
+                        <p class="text-sm text-red-600 mt-1">{{ form.naturaleza.errors|first }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Campo: Es Imputable -->
+            <div class="flex items-start">
+                <div class="flex items-center h-5">
+                    {{ form.es_imputable }}
+                </div>
+                <div class="ml-3 text-sm">
+                    <label for="{{ form.es_imputable.id_for_label }}" class="font-medium text-gray-700">Es Imputable (Cuenta de Movimiento)</label>
+                    <p class="text-gray-500 text-xs">Marcar esta casilla si la cuenta recibirá transacciones (débitos/créditos). Dejar sin marcar si es una cuenta de grupo (ej. 'Activo Corriente').</p>
+                </div>
+            </div>
+            {% if form.es_imputable.errors %}
+                <p class="text-sm text-red-600 mt-1">{{ form.es_imputable.errors|first }}</p>
+            {% endif %}
+            
+        </div>
+        
+        <!-- Botones de Acción -->
+        <div class="mt-8 pt-5 border-t border-gray-200 flex justify-end">
+            <a href="{% url 'contabilidad:gestionar_catalogo' %}" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg mr-3">
+                Cancelar
+            </a>
+            <button type="submit" class="bg-sic-medium-blue hover:bg-sic-dark-blue text-white font-semibold py-2 px-4 rounded-lg shadow-md">
+                Guardar Cuenta
+            </button>
+        </div>
+        
+    </form>
+</div>
+{% endblock %}

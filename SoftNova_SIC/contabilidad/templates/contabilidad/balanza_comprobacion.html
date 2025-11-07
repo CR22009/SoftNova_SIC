@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+
+{% block title %}Balance de Comprobación{% endblock %}
+{% block page_title %}Balance de Comprobación por Saldos{% endblock %}
+
+{% block header_action %}
+    <!-- Botón de acción personalizado para esta vista -->
+    <a href="javascript:window.print()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg shadow-md transition-colors duration-200 flex items-center space-x-2">
+        <ion-icon name="print-outline" class="text-xl"></ion-icon>
+        <span>Imprimir</span>
+    </a>
+{% endblock %}
+
+{% block content %}
+<div class="bg-white p-6 rounded-lg shadow-md">
+    
+    <!-- Encabezado del Reporte (Estilo 'image_a875a4.png') -->
+    <div class="text-center mb-6">
+        <h2 class="text-3xl font-bold text-sic-dark-blue">SoftNova S.A de C.V</h2>
+        <h3 class="text-2xl font-semibold text-gray-700">Balance de Comprobación</h3>
+        <p class="text-lg text-gray-600">
+            Al {{ periodo.fecha_fin|date:"d \d\e F \d\e Y" }}
+            (Período: {{ periodo.nombre }})
+        </p>
+        <p class="text-sm text-gray-500">(Valores expresados en Dólares USD)</p>
+    </div>
+    
+    <!-- Botón de Volver -->
+    <div class="mb-4">
+        <a href="{% url 'contabilidad:mayor_seleccion' %}?periodo_id={{ periodo.id }}" class="text-sic-teal hover:underline">
+            &larr; Volver al selector de reportes
+        </a>
+    </div>
+
+    <!-- Tabla de Balanza -->
+    <div class="overflow-x-auto">
+        <table class="w-full min-w-lg">
+            <thead class="bg-gray-100">
+                <tr class="border-b-2 border-gray-300">
+                    <th class="p-3 text-left text-sm font-semibold text-gray-600 w-1/6">Código</th>
+                    <th class="p-3 text-left text-sm font-semibold text-gray-600 w-3/6">Nombre de la Cuenta</th>
+                    <th class="p-3 text-right text-sm font-semibold text-gray-600 w-1/6">Saldo Deudor ($)</th>
+                    <th class="p-3 text-right text-sm font-semibold text-gray-600 w-1/6">Saldo Acreedor ($)</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for item in resultados %}
+                <tr class="hover:bg-gray-50">
+                    <td class="p-3 text-sm text-gray-700 font-mono">{{ item.codigo }}</td>
+                    <td class="p-3 text-sm text-gray-800">{{ item.nombre }}</td>
+                    <td class="p-3 text-right text-sm text-gray-800 font-mono">
+                        {% if item.saldo_deudor > 0 %}{{ item.saldo_deudor|floatformat:2 }}{% else %}-{% endif %}
+                    </td>
+                    <td class="p-3 text-right text-sm text-gray-800 font-mono">
+                        {% if item.saldo_acreedor > 0 %}{{ item.saldo_acreedor|floatformat:2 }}{% else %}-{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <!-- Totales -->
+            <tfoot class="bg-gray-100">
+                <tr class="border-t-2 border-gray-300">
+                    <td colspan="2" class="p-4 text-right text-lg font-bold text-gray-800">SUMAS IGUALES:</td>
+                    <td class="p-4 text-right text-lg font-bold text-gray-800 font-mono">
+                        ${{ total_saldo_deudor|floatformat:2 }}
+                    </td>
+                    <td class="p-4 text-right text-lg font-bold text-gray-800 font-mono">
+                        ${{ total_saldo_acreedor|floatformat:2 }}
+                    </td>
+                </tr>
+                <!-- Verificación de Cuadre -->
+                {% if not esta_cuadrado %}
+                <tr class="bg-red-100">
+                    <td colspan="2" class="p-3 text-right font-bold text-red-700">¡DESCUADRE!</td>
+                    <td colspan="2" class="p-3 text-center font-bold text-red-700 font-mono">
+                        Diferencia: ${{ diferencia|floatformat:2 }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr class="bg-green-100">
+                    <td colspan="4" class="p-3 text-center font-bold text-green-700">
+                        BALANCE CUADRADO
+                    </td>
+                </tr>
+                {% endif %}
+            </tfoot>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
