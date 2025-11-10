@@ -1,8 +1,8 @@
 from django import forms
 from django.db import models
 from django.core.exceptions import ValidationError
-from django.forms import inlineformset_factory
-from .models import AsientoDiario, Movimiento, PeriodoContable, Cuenta
+from django.forms import inlineformset_factory, modelformset_factory
+from .models import AsientoDiario, Movimiento, PeriodoContable, Cuenta,CostoIndirectoAnual,CosteoProyecto,SalarioEstimadoMODAnual
 from django.core.exceptions import ValidationError
 
 class AsientoDiarioForm(forms.ModelForm):
@@ -229,3 +229,64 @@ class CuentaForm(forms.ModelForm):
             
         return cleaned_data
 
+#Costeo
+# costeo/forms.py
+
+class SalarioModificableForm(forms.ModelForm):
+    """
+    Formulario para editar SÓLO el salario.
+    El período (PK) no se puede cambiar.
+    """
+    class Meta:
+        model = SalarioEstimadoMODAnual
+        fields = ['salario']
+        widgets = {
+            # Usamos un NumberInput más pequeño para que quepa en la tabla
+            'salario': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'style': 'width: 120px;'}),
+        }
+
+# --- Creamos un Formset para la tabla de Salarios ---
+# Esto tomará TODOS los salarios existentes y los hará editables en una tabla.
+SalarioFormSet = modelformset_factory(
+    SalarioEstimadoMODAnual,
+    form=SalarioModificableForm,
+    extra=0  # No mostrar filas en blanco para crear (es OneToOne con Periodo, más complejo)
+)
+
+class CifModificableForm(forms.ModelForm):
+    """
+    Formulario para editar los campos de entrada de CIF.
+    """
+    class Meta:
+        model = CostoIndirectoAnual
+        # 🟢 CORRECCIÓN CLAVE: Solo incluimos el campo editable.
+        fields = ['costo_anual_estimado'] 
+        widgets = {
+            'costo_anual_estimado': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'style': 'width: 120px;'}),
+        }
+        
+    # Eliminamos el __init__ ya que no necesitamos deshabilitar/quitar requeridos
+    # para campos que no están en "fields".
+
+# --- Creamos un Formset para la tabla de CIFs ---
+CifFormSet = modelformset_factory(
+    CostoIndirectoAnual,
+    form=CifModificableForm,
+    extra=0,  # Fila de "agregar" quitada
+    can_delete=True # Permitir marcar para eliminar
+)
+
+class CosteoProyectoForm(forms.ModelForm):
+    """
+    Formulario para crear un NUEVO CosteoProyecto.
+    Como pediste: "en la de costeo todo [lo editable]".
+    """
+    class Meta:
+        model = CosteoProyecto
+        fields = ['periodo', 'descripcion_proyecto', 'horas_esfuerzo', 'cif']
+        widgets = {
+            'periodo': forms.Select(attrs={'class': 'form-select form-select-sm'}),
+            'descripcion_proyecto': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'placeholder': 'Descripción del proyecto'}),
+            'horas_esfuerzo': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'placeholder': 'Ej. 320'}),
+            'cif': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'placeholder': 'Ej. 309.87'}),
+        }

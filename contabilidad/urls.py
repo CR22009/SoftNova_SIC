@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import views, viewsCosteo
 
 app_name = 'contabilidad'  # Namespace para las URLs
 
@@ -54,5 +54,8 @@ urlpatterns = [
     # --- Gestión de Períodos ---
     path('configuracion/periodos/', views.gestionar_periodos, name='gestionar_periodos'),
     path('configuracion/periodos/cerrar/<int:periodo_id>/', views.cerrar_periodo, name='cerrar_periodo'),
+    
+    #Costo
+    path('costeo/', viewsCosteo.costeo, name='costeo'),
 ]
 

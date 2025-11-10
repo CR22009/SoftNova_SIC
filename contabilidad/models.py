@@ -312,3 +312,379 @@ class Movimiento(models.Model):
         if not self.cuenta.esta_activa:
             raise ValidationError(f"La cuenta '{self.cuenta.nombre}' está inactiva y no puede recibir nuevos movimientos.")
 
+#COSTEO
+
+# --- Nuevos Modelos Basados en tus Imágenes ---
+
+## 💰 Modelo para Salario MOD Anual (Imagen 3)
+# Este modelo almacena el salario base y calcula automáticamente el MOD Unitario
+# para un período contable específico.
+
+class SalarioEstimadoMODAnual(models.Model):
+    """
+    Configuración del Salario Estimado de Mano de Obra Directa (MOD) Anual.
+    Calcula y almacena el MOD Unitario (costo por hora).
+    Basado en la Imagen 3 ('image_b25d61.png').
+    """
+    periodo = models.OneToOneField(
+        PeriodoContable,
+        on_delete=models.CASCADE,
+        primary_key=True,
+        help_text="Período contable al que aplica este salario."
+    )
+    descripcion = models.CharField(
+        max_length=255, 
+        default="SalarioEstimadoMODAnual"
+    )
+    salario = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2,
+        help_text="Salario Anual Estimado (Ej. 126,000.00)"
+    )
+    mod_unitario = models.DecimalField(
+        max_digits=12, 
+        decimal_places=4,
+        editable=False,
+        null=True, 
+        blank=True,
+        help_text="Costo por hora (MOD Unitario) calculado automáticamente."
+    )
+
+    def __str__(self):
+        return f"{self.descripcion} ({self.periodo.nombre}) - ${self.salario}"
+
+    def calcular_mod_unitario(self):
+        """
+        Calcula el MOD Unitario según tu fórmula:
+        (((SalarioAnual / 14) / 12)) / ((44 * 52) / 12)
+        """
+        if self.salario is None or self.salario == 0:
+            return Decimal(0)
+        
+        try:
+            # Constantes de la fórmula
+            DIVISOR_SALARIO = Decimal(14)
+            MESES_ANIO = Decimal(12)
+            HORAS_SEMANA = Decimal(44)
+            SEMANAS_ANIO = Decimal(52)
+            
+            # Numerador: (((salrioAnualMOd/14)/12))
+            numerador = (self.salario / DIVISOR_SALARIO) / MESES_ANIO
+            
+            # Denominador: ((44*52)/12)
+            denominador = (HORAS_SEMANA * SEMANAS_ANIO) / MESES_ANIO
+            
+            if denominador == 0:
+                return Decimal(0)
+
+            # Cálculo final
+            resultado = numerador / denominador
+            return resultado.quantize(Decimal('0.0001')) # Redondea a 4 decimales
+            
+        except (TypeError, ZeroDivisionError):
+            return Decimal(0)
+
+    def save(self, *args, **kwargs):
+        # Calcula el MOD unitario antes de guardar
+        self.mod_unitario = self.calcular_mod_unitario()
+        super().save(*args, **kwargs)
+
+    class Meta:
+        verbose_name = "Configuración Salario MOD Anual"
+        verbose_name_plural = "Configuraciones Salario MOD Anual"
+
+## 🧾 Modelo para CIF Específico (Imagen 2)
+# Almacena cada línea de costo indirecto y calcula su factor individual
+# en relación con el Salario MOD Anual del mismo período.
+
+class CostoIndirectoAnual(models.Model):
+    """
+    Define un Costo Indirecto de Fabricación (CIF) Específico Anual.
+    Calcula el 'Factor' basado en el Salario MOD Anual del período.
+    Basado en la Imagen 2 ('image_b25d06.png').
+    """
+    
+    class CategoriaChoices(models.TextChoices):
+        PRODUCCION = 'PRODUCCION', 'Costo General de Produccion'
+        POSTVENTA = 'POSTVENTA', 'Costos Prostventa'
+        MANO_OBRA_IND = 'MANO_OBRA_IND', 'Mano de Obra Indirecta'
+        MATERIALES_SUM = 'MATERIALES_SUM', 'Materiales y Suministros Indirectos'
+        OTRO = 'OTRO', 'Otro'
+
+    periodo = models.ForeignKey(
+        PeriodoContable,
+        on_delete=models.CASCADE,
+        related_name="costos_indirectos",
+        help_text="Período contable al que aplica este costo."
+    )
+    nombre = models.CharField(
+        max_length=255,
+        help_text="Nombre del CIF Específico (Ej. Alquiler o Renta de Oficinas)"
+    )
+    categoria = models.CharField(
+        max_length=100,
+        choices=CategoriaChoices.choices,
+        default=CategoriaChoices.OTRO
+    )
+    costo_anual_estimado = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2,
+        help_text="Costo Anual Estimado para este ítem.",
+       
+        default=Decimal('0.00') # Asigna 0.00 por defecto
+    )
+    factor = models.DecimalField(
+        max_digits=15, 
+        decimal_places=10,
+        editable=False,
+        null=True, 
+        blank=True,
+        help_text="Factor calculado (Costo Anual / Salario MOD Anual)"
+    )
+
+    def __str__(self):
+        return f"{self.nombre} ({self.periodo.nombre}) - ${self.costo_anual_estimado}"
+
+    def calcular_factor(self):
+        """
+        Calcula el Factor dividiendo el costo anual entre 
+        el Salario MOD Anual del mismo período.
+        """
+        try:
+            # Busca la configuración de salario para el mismo período
+            salario_config = SalarioEstimadoMODAnual.objects.get(periodo=self.periodo)
+            
+            if salario_config.salario and salario_config.salario > 0:
+                resultado = self.costo_anual_estimado / salario_config.salario
+                return resultado.quantize(Decimal('0.0000000001')) # Redondea a 10 decimales
+            
+        except SalarioEstimadoMODAnual.DoesNotExist:
+            # No se puede calcular si no hay salario configurado
+            pass
+        except (TypeError, ZeroDivisionError):
+            pass
+            
+        return Decimal(0)
+
+    def save(self, *args, **kwargs):
+        # Calcula el factor antes de guardar
+        self.factor = self.calcular_factor()
+        super().save(*args, **kwargs)
+
+    class Meta:
+        verbose_name = "Costo Indirecto Anual (CIF)"
+        verbose_name_plural = "Costos Indirectos Anuales (CIF)"
+        unique_together = ('periodo', 'nombre') # Evita duplicados en el mismo período
+
+## 📋 Modelo para Costeo de Proyecto (Imagen 1)
+# Este es el modelo principal que consume la configuración.
+# El usuario ingresa las 'Horas de Esfuerzo' y el 'CIF'.
+# El modelo calcula el 'Total' automáticamente.
+
+class CosteoProyecto(models.Model):
+    """
+    Registro de costeo para un proyecto específico.
+    Utiliza los valores configurados de MOD Unitario y Factores.
+    Basado en la Imagen 1 ('image_b25dbc.png').
+    """
+    idCosteo = models.AutoField(primary_key=True)
+    periodo = models.ForeignKey(
+        PeriodoContable,
+        on_delete=models.PROTECT, # Proteger para no borrar costeos si se borra un período
+        help_text="Período de configuración que usará este costeo."
+    )
+    descripcion_proyecto = models.TextField(
+        blank=True, 
+        null=True
+    )
+    
+    # --- Campos de Entrada (Input) ---
+    horas_esfuerzo = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2,
+        help_text="Horas de esfuerzo ingresadas para el proyecto (Ej. 320)"
+    )
+    cif = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2,
+        help_text="Costo Indirecto de Fabricación asignado (Ej. 309.87)"
+    )
+
+    # --- Campos Calculados (Automáticos) ---
+    mod_unitario = models.DecimalField(
+        max_digits=12, 
+        decimal_places=4,
+        editable=False,
+        help_text="Costo MOD por hora (obtenido de la config. del período)"
+    )
+    factor_suma = models.DecimalField(
+        max_digits=15, 
+        decimal_places=10,
+        editable=False,
+        # --- MODIFICACIÓN 1: Actualizar el help_text ---
+        help_text="Suma de factores CIF del período / 12"
+    )
+    mod_total = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2,
+        editable=False,
+        help_text="MOD Unitario * Horas de Esfuerzo"
+    )
+    total = models.DecimalField(
+        max_digits=14, 
+        decimal_places=2,
+        editable=False,
+        help_text="Costo total del proyecto (MOD Total + CIF)"
+    )
+
+    def __str__(self):
+        return f"Costeo {self.idCosteo}: {self.descripcion_proyecto[:50]}... ({self.periodo.nombre})"
+
+    def recalcular_costeo(self):
+        """
+        Obtiene los valores de configuración del período y calcula los totales.
+        """
+        try:
+            # 1. Obtener el MOD Unitario de la configuración del período
+            salario_config = SalarioEstimadoMODAnual.objects.get(periodo=self.periodo)
+            self.mod_unitario = salario_config.mod_unitario or Decimal(0)
+            
+            # --- MODIFICACIÓN 2: Actualizar el cálculo de factor_suma ---
+            # 2. Obtener la Suma de Factores (FactorSuma) y dividirla entre 12
+            agregado = CostoIndirectoAnual.objects.filter(
+                periodo=self.periodo
+            ).aggregate(
+                suma_factores=Sum('factor')
+            )
+            suma_bruta = agregado['suma_factores'] or Decimal(0)
+            
+            # Dividimos la suma bruta entre 12
+            self.factor_suma = (suma_bruta / Decimal(12)).quantize(Decimal('0.0000000001')) 
+            # --- Fin de la Modificación 2 ---
+
+            # 3. Calcular MOD Total (MOD Unitario * Horas de Esfuerzo)
+            self.mod_total = (self.mod_unitario * self.horas_esfuerzo).quantize(Decimal('0.01'))
+            
+            # 4. Calcular Total (MOD Total + CIF)
+            #    (Según tu fórmula: "total es la suma de modunitario por mano de esfuerzo mas los cif")
+            self.total = (self.mod_total + self.cif).quantize(Decimal('0.01'))
+
+        except SalarioEstimadoMODAnual.DoesNotExist:
+            # ... (resto del método sin cambios)
+            raise ValidationError(
+                f"No existe configuración de 'SalarioEstimadoMODAnual' para el período '{self.periodo}'. "
+                f"Por favor, configure primero el salario para este período."
+            )
+        except TypeError:
+             raise ValidationError("Error en el tipo de datos. Asegúrese de que 'horas_esfuerzo' y 'cif' sean números.")
+
+    def save(self, *args, **kwargs):
+        # ... (sin cambios)
+        self.recalcular_costeo()
+        super().save(*args, **kwargs)
+
+    class Meta:
+        # ... (sin cambios)
+        verbose_name = "Costeo de Proyecto"
+        verbose_name_plural = "Costeos de Proyectos"
+        ordering = ['-periodo', '-idCosteo']
+    """
+    Registro de costeo para un proyecto específico.
+    Utiliza los valores configurados de MOD Unitario y Factores.
+    Basado en la Imagen 1 ('image_b25dbc.png').
+    """
+    idCosteo = models.AutoField(primary_key=True)
+    periodo = models.ForeignKey(
+        PeriodoContable,
+        on_delete=models.PROTECT, # Proteger para no borrar costeos si se borra un período
+        help_text="Período de configuración que usará este costeo."
+    )
+    descripcion_proyecto = models.TextField(
+        blank=True, 
+        null=True
+    )
+    
+    # --- Campos de Entrada (Input) ---
+    horas_esfuerzo = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2,
+        help_text="Horas de esfuerzo ingresadas para el proyecto (Ej. 320)"
+    )
+    cif = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2,
+        help_text="Costo Indirecto de Fabricación asignado (Ej. 309.87)"
+    )
+
+    # --- Campos Calculados (Automáticos) ---
+    mod_unitario = models.DecimalField(
+        max_digits=12, 
+        decimal_places=4,
+        editable=False,
+        help_text="Costo MOD por hora (obtenido de la config. del período)"
+    )
+    factor_suma = models.DecimalField(
+        max_digits=15, 
+        decimal_places=10,
+        editable=False,
+        help_text="Suma de todos los factores CIF del período"
+    )
+    mod_total = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2,
+        editable=False,
+        help_text="MOD Unitario * Horas de Esfuerzo"
+    )
+    total = models.DecimalField(
+        max_digits=14, 
+        decimal_places=2,
+        editable=False,
+        help_text="Costo total del proyecto (MOD Total + CIF)"
+    )
+
+    def __str__(self):
+        return f"Costeo {self.idCosteo}: {self.descripcion_proyecto[:50]}... ({self.periodo.nombre})"
+
+    def recalcular_costeo(self):
+        """
+        Obtiene los valores de configuración del período y calcula los totales.
+        """
+        try:
+            # 1. Obtener el MOD Unitario de la configuración del período
+            salario_config = SalarioEstimadoMODAnual.objects.get(periodo=self.periodo)
+            self.mod_unitario = salario_config.mod_unitario or Decimal(0)
+            
+            # 2. Obtener la Suma de Factores (FactorSuma)
+            agregado = CostoIndirectoAnual.objects.filter(
+                periodo=self.periodo
+            ).aggregate(
+                suma_factores=Sum('factor')
+            )
+            self.factor_suma = agregado['suma_factores'] or Decimal(0)
+
+            # 3. Calcular MOD Total (MOD Unitario * Horas de Esfuerzo)
+            self.mod_total = (self.mod_unitario * self.horas_esfuerzo).quantize(Decimal('0.01'))
+            
+            # 4. Calcular Total (MOD Total + CIF)
+            #    (Según tu fórmula: "total es la suma de modunitario por mano de esfuerzo mas los cif")
+            self.total = (self.mod_total + self.cif).quantize(Decimal('0.01'))
+
+        except SalarioEstimadoMODAnual.DoesNotExist:
+            # No se puede calcular si el período no tiene salario configurado
+            raise ValidationError(
+                f"No existe configuración de 'SalarioEstimadoMODAnual' para el período '{self.periodo}'. "
+                f"Por favor, configure primero el salario para este período."
+            )
+        except TypeError:
+             raise ValidationError("Error en el tipo de datos. Asegúrese de que 'horas_esfuerzo' y 'cif' sean números.")
+
+    def save(self, *args, **kwargs):
+        # Ejecuta todos los cálculos antes de guardar el objeto
+        self.recalcular_costeo()
+        super().save(*args, **kwargs)
+
+    class Meta:
+        verbose_name = "Costeo de Proyecto"
+        verbose_name_plural = "Costeos de Proyectos"
+        ordering = ['-periodo', '-idCosteo']
+

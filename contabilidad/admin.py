@@ -1,6 +1,7 @@
 from django.contrib import admin
-from .models import Cuenta, PeriodoContable, AsientoDiario, Movimiento
+from .models import Cuenta, PeriodoContable, AsientoDiario, Movimiento,SalarioEstimadoMODAnual,CosteoProyecto,CostoIndirectoAnual
 from decimal import Decimal
+
 
 # --- Admin de Cuenta (Existente) ---
 @admin.register(Cuenta)
@@ -178,3 +179,50 @@ class AsientoDiarioAdmin(admin.ModelAdmin):
             return False
         return super().has_delete_permission(request, obj)
 
+# --- (INICIO) CÓDIGO AGREGADO PARA COSTEO ---
+
+@admin.register(SalarioEstimadoMODAnual)
+class SalarioEstimadoMODAnualAdmin(admin.ModelAdmin):
+    """
+    Admin para configurar el Salario MOD base de un período.
+    """
+    list_display = ('periodo', 'descripcion', 'salario', 'mod_unitario')
+    # Protege el campo 'mod_unitario' que se calcula solo
+    readonly_fields = ('mod_unitario',)
+    search_fields = ('descripcion', 'periodo__nombre')
+    list_filter = ('periodo',)
+
+@admin.register(CostoIndirectoAnual)
+class CostoIndirectoAnualAdmin(admin.ModelAdmin):
+    """
+    Admin para registrar las líneas de CIF de un período.
+    """
+    list_display = ('nombre', 'periodo', 'categoria', 'costo_anual_estimado', 'factor')
+    list_filter = ('periodo', 'categoria')
+    search_fields = ('nombre', 'periodo__nombre')
+    autocomplete_fields = ('periodo',)
+    
+    # Protege el campo 'factor' que se calcula solo
+    readonly_fields = ('factor',)
+
+@admin.register(CosteoProyecto)
+class CosteoProyectoAdmin(admin.ModelAdmin):
+    """
+    Admin para registrar y calcular el costeo de un proyecto.
+    """
+    list_display = ('idCosteo', 'descripcion_proyecto_corta', 'periodo', 'horas_esfuerzo', 'cif', 'mod_total', 'total')
+    list_filter = ('periodo',)
+    search_fields = ('descripcion_proyecto', 'idCosteo', 'periodo__nombre')
+    autocomplete_fields = ('periodo',)
+    
+    # Protege todos los campos calculados automáticamente
+    readonly_fields = ('mod_unitario', 'factor_suma', 'mod_total', 'total')
+
+    # Función auxiliar para acortar la descripción en la lista
+    @admin.display(description='Descripción Proyecto')
+    def descripcion_proyecto_corta(self, obj):
+        if obj.descripcion_proyecto:
+            return (obj.descripcion_proyecto[:40] + '...') if len(obj.descripcion_proyecto) > 40 else obj.descripcion_proyecto
+        return '-' # Muestra un guion si no hay descripción
+
+# --- (FIN) CÓDIGO AGREG
