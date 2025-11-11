@@ -273,7 +273,7 @@ CifFormSet = modelformset_factory(
     CostoIndirectoAnual,
     form=CifModificableForm,
     extra=0,  # Fila de "agregar" quitada
-    can_delete=True # Permitir marcar para eliminar
+    can_delete=False # Permitir marcar para eliminar
 )
 
 class CosteoProyectoForm(forms.ModelForm):

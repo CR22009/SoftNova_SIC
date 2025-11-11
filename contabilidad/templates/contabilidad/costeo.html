@@ -212,7 +212,7 @@
                     <div>Categoría</div>
                     <div>Costo Anual Estimado (Editable)</div>
                     <div>Factor (Calculado)</div>
-                    <div>¿Eliminar?</div>
+                    <div></div>
                 </div>
 
                 {% for form in cif_formset %}
@@ -500,6 +500,7 @@
                 }
             }
             input.addEventListener('input', recalcularMOD);
+            recalcularMOD();
         });
 
 

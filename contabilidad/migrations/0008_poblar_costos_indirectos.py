@@ -38,22 +38,33 @@ def poblar_costos_indirectos(apps, schema_editor):
     # Obtenemos los modelos históricos
     CostoIndirectoAnual = apps.get_model('contabilidad', 'CostoIndirectoAnual')
     PeriodoContable = apps.get_model('contabilidad', 'PeriodoContable')
+    SalarioEstimadoMODAnual = apps.get_model('contabilidad', 'SalarioEstimadoMODAnual')
 
     # --- 2. CAMBIO DE 'get' A 'get_or_create' ---
     # Intenta obtener 'Periodo1'. Si no existe, lo crea usando 'defaults'.
     periodo_1, creado = PeriodoContable.objects.get_or_create(
         nombre='Periodo 1',
         defaults={
-            # --- 3. ¡DEBES AJUSTAR ESTAS FECHAS! ---
             'fecha_inicio': date(2025, 11, 1), 
             'fecha_fin': date(2025, 11, 30),
-            # 'estado' usará el valor 'default' definido en tu modelo (ABIERTO)
         }
     )
     
     # Si 'creado' es True, imprimirá un mensaje en la consola
     if creado:
-        print(" -> Se creó el PeriodoContable 'Periodo1' (faltaba).")
+        print(" -> Se creó el PeriodoContable 'Periodo1'.")
+        
+    salario_obj, salario_creado = SalarioEstimadoMODAnual.objects.get_or_create(
+        periodo=periodo_1,
+        defaults={
+            'descripcion': 'Salario MOD (Default Migración)',
+            'salario': Decimal('750.00')
+        }
+    )
+    if salario_creado:
+        print(f" -> Creado Salario MOD para 'Periodo 1' con valor {salario_obj.salario}.")
+    else:
+        print(f" -> Salario MOD para 'Periodo 1' ya existía (Valor: {salario_obj.salario}).")
 
     # Preparamos los objetos para bulk_create
     costos_para_crear = []
@@ -83,11 +94,12 @@ def deshacer_poblar_costos(apps, schema_editor):
     """
     CostoIndirectoAnual = apps.get_model('contabilidad', 'CostoIndirectoAnual')
     PeriodoContable = apps.get_model('contabilidad', 'PeriodoContable')
+    SalarioEstimadoMODAnual = apps.get_model('contabilidad', 'SalarioEstimadoMODAnual')
 
     try:
         periodo_1 = PeriodoContable.objects.get(nombre='Periodo1')
     except PeriodoContable.DoesNotExist:
-        return # No hay nada que borrar
+        return
 
     nombres_costos = [item[0] for item in COSTOS_DATA]
     
@@ -95,6 +107,8 @@ def deshacer_poblar_costos(apps, schema_editor):
         periodo=periodo_1,
         nombre__in=nombres_costos
     ).delete()
+    
+    SalarioEstimadoMODAnual.objects.filter(periodo=periodo_1).delete()
 
 
 class Migration(migrations.Migration):
