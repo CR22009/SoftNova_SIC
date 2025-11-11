@@ -287,18 +287,22 @@ def balanza_comprobacion(request, periodo_id):
 
 # --- ========================================= ---
 # ---     FASE 3 - Estados Financieros          ---
-# --- (MODIFICACIONES EN ESTADO DE PATRIMONIO)  ---
+# --- (Sin cambios, ya están correctos)         ---
 # --- ========================================= ---
 
-# --- Funciones Auxiliares (Sin cambios) ---
-def _calcular_saldos_cuentas_por_tipo(periodo, tipo_cuenta):
+def _calcular_saldos_cuentas_por_tipo(periodo, tipo_cuenta, excluir_automaticos=False):
     # ... (Sin cambios) ...
     cuentas = Cuenta.objects.filter(tipo_cuenta=tipo_cuenta, es_imputable=True).order_by('codigo')
     lista_saldos = []
     total_general_tipo = Decimal('0.00')
 
     for c in cuentas:
-        agregado = Movimiento.objects.filter(asiento__periodo=periodo, cuenta=c).aggregate(
+        movimientos_query = Movimiento.objects.filter(asiento__periodo=periodo, cuenta=c)
+        
+        if excluir_automaticos:
+            movimientos_query = movimientos_query.exclude(asiento__es_asiento_automatico=True)
+            
+        agregado = movimientos_query.aggregate(
             total_debe=models.Sum('debe'),
             total_haber=models.Sum('haber')
         )
@@ -320,21 +324,15 @@ def _calcular_saldos_cuentas_por_tipo(periodo, tipo_cuenta):
 
 def _get_utilidad_del_ejercicio(periodo):
     # ... (Sin cambios) ...
-    _, total_ingresos = _calcular_saldos_cuentas_por_tipo(periodo, Cuenta.TipoCuenta.INGRESO)
-    _, total_costos = _calcular_saldos_cuentas_por_tipo(periodo, Cuenta.TipoCuenta.COSTO)
-    _, total_gastos = _calcular_saldos_cuentas_por_tipo(periodo, Cuenta.TipoCuenta.GASTO)
+    _, total_ingresos = _calcular_saldos_cuentas_por_tipo(periodo, Cuenta.TipoCuenta.INGRESO, excluir_automaticos=True)
+    _, total_costos = _calcular_saldos_cuentas_por_tipo(periodo, Cuenta.TipoCuenta.COSTO, excluir_automaticos=True)
+    _, total_gastos = _calcular_saldos_cuentas_por_tipo(periodo, Cuenta.TipoCuenta.GASTO, excluir_automaticos=True)
     
     utilidad = total_ingresos - (total_costos + total_gastos)
     return utilidad
 
-# ---
-# --- (INICIO) MODIFICACIÓN: Nuevas funciones auxiliares para Estado de Patrimonio
-# ---
-
 def _get_saldo_a_fecha(cuenta, fecha):
-    """
-    Calcula el saldo acumulado de una cuenta específica HASTA una fecha dada.
-    """
+    # ... (Sin cambios) ...
     if not fecha:
         return Decimal('0.00')
         
@@ -348,47 +346,32 @@ def _get_saldo_a_fecha(cuenta, fecha):
     total_debe = agregado.get('total_debe') or Decimal('0.00')
     total_haber = agregado.get('total_haber') or Decimal('0.00')
     
-    # Asumimos naturaleza ACREEDORA para todas las cuentas de patrimonio
-    # (excepto pérdidas, que darán saldo negativo)
     if cuenta.naturaleza == Cuenta.NaturalezaCuenta.DEUDORA:
          return total_debe - total_haber
     else:
          return total_haber - total_debe
 
 def _calcular_detalle_cuenta_patrimonio(cuenta, periodo, periodo_anterior):
-    """
-    Calcula el saldo inicial, movimientos y saldo final para una cuenta
-    de patrimonio específica, separando aportes/retiros.
-    """
-    
-    # 1. Saldo Inicial (Saldo al final del período anterior)
-    # La lógica de cierre/apertura transfiere '34' a '33',
-    # por lo que el saldo de '34' (Utilidad Ejercicio) siempre es 0 al inicio.
+    # ... (Sin cambios) ...
     if cuenta.codigo == '34': 
          saldo_inicial = Decimal('0.00')
     else:
         fecha_saldo_inicial = periodo_anterior.fecha_fin if periodo_anterior else None
-        # _get_saldo_a_fecha incluirá todos los movimientos hasta esa fecha,
-        # incluyendo el asiento de cierre del período anterior.
         saldo_inicial = _get_saldo_a_fecha(cuenta, fecha_saldo_inicial)
 
-    # 2. Movimientos (Aportes/Retiros)
-    # Son los movimientos *manuales* del período (excluyendo cierre/apertura).
     agregado_mov = Movimiento.objects.filter(
         asiento__periodo=periodo,
         cuenta=cuenta,
-        asiento__es_asiento_automatico=False # ¡Importante!
+        asiento__es_asiento_automatico=False 
     ).aggregate(
         total_debe=models.Sum('debe'),
         total_haber=models.Sum('haber')
     )
-    mov_debe = agregado_mov.get('total_debe') or Decimal('0.00') # Retiros
-    mov_haber = agregado_mov.get('total_haber') or Decimal('0.00') # Aportes
+    mov_debe = agregado_mov.get('total_debe') or Decimal('0.00') 
+    mov_haber = agregado_mov.get('total_haber') or Decimal('0.00')
     
-    # Movimientos = Aportes (Haber) - Retiros (Debe)
     movimientos = mov_haber - mov_debe
     
-    # 3. Saldo Final
     saldo_final = saldo_inicial + movimientos
     
     return {
@@ -397,12 +380,6 @@ def _calcular_detalle_cuenta_patrimonio(cuenta, periodo, periodo_anterior):
         'saldo_final': saldo_final.quantize(Decimal('0.01'))
     }
 
-# ---
-# --- (FIN) MODIFICACIÓN: Nuevas funciones auxiliares
-# ---
-
-
-# --- Helper para Flujo de Efectivo (Sin cambios) ---
 def _get_saldo_cuentas(cuentas_ids, periodo):
     # ... (Sin cambios) ...
     if not periodo:
@@ -421,16 +398,15 @@ def _get_saldo_cuentas(cuentas_ids, periodo):
     saldo = total_debe - total_haber
     return saldo
 
-# --- Estado de Resultados (Sin cambios) ---
 @login_required
 @user_passes_test(check_acceso_contable) 
 def estado_resultados(request, periodo_id):
     # ... (Sin cambios) ...
     periodo = get_object_or_404(PeriodoContable, pk=periodo_id)
     
-    lista_ingresos, total_ingresos = _calcular_saldos_cuentas_por_tipo(periodo, Cuenta.TipoCuenta.INGRESO)
-    lista_costos, total_costos = _calcular_saldos_cuentas_por_tipo(periodo, Cuenta.TipoCuenta.COSTO)
-    lista_gastos, total_gastos = _calcular_saldos_cuentas_por_tipo(periodo, Cuenta.TipoCuenta.GASTO)
+    lista_ingresos, total_ingresos = _calcular_saldos_cuentas_por_tipo(periodo, Cuenta.TipoCuenta.INGRESO, excluir_automaticos=True)
+    lista_costos, total_costos = _calcular_saldos_cuentas_por_tipo(periodo, Cuenta.TipoCuenta.COSTO, excluir_automaticos=True)
+    lista_gastos, total_gastos = _calcular_saldos_cuentas_por_tipo(periodo, Cuenta.TipoCuenta.GASTO, excluir_automaticos=True)
     
     utilidad_bruta = total_ingresos - total_costos
     utilidad_neta = utilidad_bruta - total_gastos 
@@ -469,7 +445,6 @@ def hub_estado_resultados(request):
     }
     return render(request, 'contabilidad/hub_estado_resultados.html', context)
 
-# --- Balance General (Sin cambios) ---
 @login_required
 @user_passes_test(check_acceso_contable) 
 def balance_general(request, periodo_id):
@@ -479,9 +454,11 @@ def balance_general(request, periodo_id):
     lista_activos, total_activos = _calcular_saldos_cuentas_por_tipo(periodo, Cuenta.TipoCuenta.ACTIVO)
     lista_pasivos, total_pasivos = _calcular_saldos_cuentas_por_tipo(periodo, Cuenta.TipoCuenta.PASIVO)
     lista_patrimonio, total_patrimonio = _calcular_saldos_cuentas_por_tipo(periodo, Cuenta.TipoCuenta.PATRIMONIO)
+    
     utilidad_ejercicio = _get_utilidad_del_ejercicio(periodo)
     
-    total_patrimonio_final = total_patrimonio + utilidad_ejercicio
+    total_patrimonio_final = total_patrimonio
+    
     total_pasivo_patrimonio = total_pasivos + total_patrimonio_final
     
     diferencia = total_activos - total_pasivo_patrimonio
@@ -494,8 +471,8 @@ def balance_general(request, periodo_id):
         'lista_pasivos': lista_pasivos,
         'total_pasivos': total_pasivos,
         'lista_patrimonio': lista_patrimonio,
-        'total_patrimonio': total_patrimonio,
-        'utilidad_ejercicio': utilidad_ejercicio,
+        'total_patrimonio': total_patrimonio, 
+        'utilidad_ejercicio': utilidad_ejercicio, 
         'total_patrimonio_final': total_patrimonio_final,
         'total_pasivo_patrimonio': total_pasivo_patrimonio,
         'diferencia': diferencia,
@@ -525,7 +502,6 @@ def hub_balance_general(request):
     return render(request, 'contabilidad/hub_balance_general.html', context)
 
 
-# --- Flujo de Efectivo (Sin cambios) ---
 @login_required
 @user_passes_test(check_acceso_contable) 
 def flujo_efectivo(request, periodo_id):
@@ -637,8 +613,6 @@ def hub_flujo_efectivo(request):
     }
     return render(request, 'contabilidad/hub_flujo_efectivo.html', context)
 
-
-# --- Estado de Patrimonio ---
 @login_required
 @user_passes_test(check_acceso_contable) 
 def hub_estado_patrimonio(request):
@@ -660,26 +634,18 @@ def hub_estado_patrimonio(request):
     }
     return render(request, 'contabilidad/hub_estado_patrimonio.html', context)
 
-# ---
-# --- (INICIO) MODIFICACIÓN: Función 'estado_patrimonio' reemplazada
-# ---
 @login_required
 @user_passes_test(check_acceso_contable)
 def estado_patrimonio(request, periodo_id):
-    """
-    Muestra el reporte de Estado de Cambios en el Patrimonio,
-    detallando saldos iniciales, movimientos y saldos finales.
-    """
+    # ... (Sin cambios) ...
     periodo = get_object_or_404(PeriodoContable, pk=periodo_id)
     
-    # 1. Encontrar período anterior (para saldos iniciales)
     periodo_anterior = PeriodoContable.objects.filter(
         estado=PeriodoContable.EstadoPeriodo.CERRADO,
         fecha_fin__lt=periodo.fecha_inicio
     ).order_by('-fecha_fin').first()
 
     try:
-        # 2. Obtener cuentas clave de patrimonio
         cta_capital = Cuenta.objects.get(codigo='31')
         cta_reserva = Cuenta.objects.get(codigo='32')
         cta_resultados_acum = Cuenta.objects.get(codigo='33')
@@ -687,12 +653,10 @@ def estado_patrimonio(request, periodo_id):
         messages.error(request, f"Error crítico: Falta una cuenta de patrimonio (31, 32 o 33) en el catálogo. {e}")
         return redirect('contabilidad:hub_estado_patrimonio')
 
-    # 3. Calcular detalles para cada cuenta (usando la nueva helper)
     reporte_capital = _calcular_detalle_cuenta_patrimonio(cta_capital, periodo, periodo_anterior)
     reporte_reserva = _calcular_detalle_cuenta_patrimonio(cta_reserva, periodo, periodo_anterior)
     reporte_resultados_acum = _calcular_detalle_cuenta_patrimonio(cta_resultados_acum, periodo, periodo_anterior)
     
-    # 4. Calcular la utilidad neta del *ejercicio actual*
     utilidad_neta_actual = _get_utilidad_del_ejercicio(periodo)
     reporte_utilidad = {
         'saldo_inicial': Decimal('0.00'),
@@ -700,7 +664,6 @@ def estado_patrimonio(request, periodo_id):
         'saldo_final': utilidad_neta_actual.quantize(Decimal('0.01'))
     }
 
-    # 5. Consolidar el reporte para el template
     reporte = {
         'capital_social': reporte_capital,
         'reserva_legal': reporte_reserva,
@@ -708,12 +671,11 @@ def estado_patrimonio(request, periodo_id):
         'utilidad_ejercicio': reporte_utilidad,
     }
     
-    # 6. Calcular totales para el footer
     total_saldo_inicial = (
         reporte_capital['saldo_inicial'] + 
         reporte_reserva['saldo_inicial'] + 
         reporte_resultados_acum['saldo_inicial'] +
-        reporte_utilidad['saldo_inicial'] # (es 0)
+        reporte_utilidad['saldo_inicial'] 
     )
     total_movimientos = (
         reporte_capital['movimientos'] + 
@@ -736,13 +698,10 @@ def estado_patrimonio(request, periodo_id):
 
     context = {
         'periodo': periodo,
-        'reporte': reporte, # El template 'estado_patrimonio.html' usa 'reporte'
-        'totales': totales, # El template 'estado_patrimonio.html' usa 'totales'
+        'reporte': reporte, 
+        'totales': totales, 
     }
     return render(request, 'contabilidad/estado_patrimonio.html', context)
-# ---
-# --- (FIN) MODIFICACIÓN: Función 'estado_patrimonio' reemplazada
-# ---
 
 
 # --- ========================================= ---
@@ -860,6 +819,7 @@ def gestionar_periodos(request):
                 ).order_by('-fecha_fin').first()
 
                 if ultimo_periodo_cerrado:
+                    # Esta llamada ahora usará la función _crear_asiento_apertura CORREGIDA
                     _crear_asiento_apertura(nuevo_periodo, ultimo_periodo_cerrado, request)
                 else:
                     messages.info(request, "Este es el primer período (o no hay período cerrado anterior), no se generó asiento de apertura.")
@@ -930,7 +890,11 @@ def cerrar_periodo(request, periodo_id):
     cuentas_resultado = Cuenta.objects.filter(tipo_cuenta__in=tipos_resultado, es_imputable=True)
 
     for cuenta in cuentas_resultado:
-        agregado = Movimiento.objects.filter(asiento__periodo=periodo_a_cerrar, cuenta=cuenta).aggregate(
+        agregado = Movimiento.objects.filter(
+            asiento__periodo=periodo_a_cerrar, 
+            cuenta=cuenta,
+            asiento__es_asiento_automatico=False
+        ).aggregate(
             debe=Sum('debe'), haber=Sum('haber')
         )
         saldo_debe = (agregado['debe'] or 0)
@@ -964,16 +928,34 @@ def cerrar_periodo(request, periodo_id):
     return redirect('contabilidad:gestionar_periodos')
 
 
+# --- 
+# --- INICIO DE MODIFICACIÓN: Función _crear_asiento_apertura REESCRITA
+# --- 
 def _crear_asiento_apertura(nuevo_periodo, periodo_anterior, request):
-    # ... (Sin cambios) ...
+    """
+    Función auxiliar interna.
+    Crea el asiento de apertura para el nuevo_periodo, basándose
+    en los saldos finales del periodo_anterior.
+    
+    LÓGICA CORREGIDA: Calcula el traspaso de '34' a '33'
+    explícitamente para evitar errores de orden.
+    """
     admin_user = request.user
     
     try:
-        cuenta_utilidad_ejercicio = Cuenta.objects.get(codigo='34') 
-        cuenta_resultados_acum = Cuenta.objects.get(codigo='33') 
+        cuenta_utilidad_ejercicio = Cuenta.objects.get(codigo='34') # Utilidad o Pérdida del Ejercicio
+        cuenta_resultados_acum = Cuenta.objects.get(codigo='33') # Resultados Acumulados
     except Cuenta.DoesNotExist:
         messages.error(request, "Error Crítico: No se encontraron las cuentas '34' o '33'. Asiento de apertura no se pudo generar.")
         return
+
+    # --- INICIO DE LÓGICA CORREGIDA ---
+    
+    # 1. Obtener saldos clave ANTES del loop
+    #    Usamos _get_saldo_a_fecha, que lee el saldo final total (incl. cierre)
+    fecha_fin_anterior = periodo_anterior.fecha_fin
+    saldo_utilidad_ejercicio = _get_saldo_a_fecha(cuenta_utilidad_ejercicio, fecha_fin_anterior)
+    saldo_acumulado_inicial = _get_saldo_a_fecha(cuenta_resultados_acum, fecha_fin_anterior)
 
     tipos_balance = [Cuenta.TipoCuenta.ACTIVO, Cuenta.TipoCuenta.PASIVO, Cuenta.TipoCuenta.PATRIMONIO]
     cuentas_balance = Cuenta.objects.filter(tipo_cuenta__in=tipos_balance, es_imputable=True)
@@ -981,52 +963,54 @@ def _crear_asiento_apertura(nuevo_periodo, periodo_anterior, request):
     movimientos_apertura = []
     total_debe_apertura = Decimal('0.00')
     total_haber_apertura = Decimal('0.00')
-    saldo_utilidad_ejercicio = Decimal('0.00')
 
+    # 2. Loop principal: procesar TODAS las cuentas EXCEPTO las de traspaso (33 y 34)
     for cuenta in cuentas_balance:
-        agregado = Movimiento.objects.filter(asiento__periodo=periodo_anterior, cuenta=cuenta).aggregate(
-            debe=Sum('debe'), haber=Sum('haber')
-        )
-        saldo_debe = (agregado['debe'] or 0)
-        saldo_haber = (agregado['haber'] or 0)
+        # Omitir las cuentas que trataremos manualmente
+        if cuenta.codigo == cuenta_utilidad_ejercicio.codigo or cuenta.codigo == cuenta_resultados_acum.codigo:
+            continue
         
-        saldo_final = Decimal('0.00')
-        if cuenta.naturaleza == Cuenta.NaturalezaCuenta.DEUDORA:
-             saldo_final = saldo_debe - saldo_haber
-        else:
-             saldo_final = saldo_haber - saldo_debe
-        
-        if cuenta.codigo == cuenta_utilidad_ejercicio.codigo:
-            saldo_utilidad_ejercicio = saldo_final
-            continue 
-        
-        if cuenta.codigo == cuenta_resultados_acum.codigo:
-            saldo_final += saldo_utilidad_ejercicio
+        # Calcular saldo final del período anterior
+        saldo_final = _get_saldo_a_fecha(cuenta, fecha_fin_anterior)
             
         if saldo_final != 0:
             if not cuenta.esta_activa and cuenta.codigo != cuenta_resultados_acum.codigo:
                 messages.warning(request, f"Se omitió el saldo de {saldo_final} de la cuenta inactiva '{cuenta.nombre}' en el asiento de apertura.")
                 continue
 
-            if saldo_final > 0: 
-                if cuenta.naturaleza == Cuenta.NaturalezaCuenta.DEUDORA: 
+            if saldo_final > 0: # Saldo normal según naturaleza
+                if cuenta.naturaleza == Cuenta.NaturalezaCuenta.DEUDORA: # Activos
                     movimientos_apertura.append(Movimiento(cuenta=cuenta, debe=saldo_final, haber=0))
                     total_debe_apertura += saldo_final
-                else: 
+                else: # Pasivos, Patrimonio (ej. 31, 32)
                     movimientos_apertura.append(Movimiento(cuenta=cuenta, debe=0, haber=saldo_final))
                     total_haber_apertura += saldo_final
-            else: 
+            else: # Saldo Invertido (ej. Activo con saldo acreedor)
                 if cuenta.naturaleza == Cuenta.NaturalezaCuenta.DEUDORA:
                     movimientos_apertura.append(Movimiento(cuenta=cuenta, debe=0, haber=abs(saldo_final)))
                     total_haber_apertura += abs(saldo_final)
                 else: 
                     movimientos_apertura.append(Movimiento(cuenta=cuenta, debe=abs(saldo_final), haber=0))
                     total_debe_apertura += abs(saldo_final)
+    
+    # 3. Traspaso Manual: Mover el saldo de '34' a '33'
+    saldo_final_acumulado = saldo_acumulado_inicial + saldo_utilidad_ejercicio
+    
+    if saldo_final_acumulado != 0:
+        if saldo_final_acumulado > 0: # Saldo Acreedor (normal)
+            movimientos_apertura.append(Movimiento(cuenta=cuenta_resultados_acum, debe=0, haber=saldo_final_acumulado))
+            total_haber_apertura += saldo_final_acumulado
+        else: # Saldo Deudor (pérdidas acumuladas)
+            movimientos_apertura.append(Movimiento(cuenta=cuenta_resultados_acum, debe=abs(saldo_final_acumulado), haber=0))
+            total_debe_apertura += abs(saldo_final_acumulado)
+
+    # --- FIN DE LÓGICA CORREGIDA ---
 
     if not movimientos_apertura:
         messages.warning(request, "No se generó asiento de apertura. No se encontraron saldos de balance en el período anterior.")
         return
 
+    # 4. Crear el Asiento de Apertura
     asiento_apertura = AsientoDiario.objects.create(
         periodo=nuevo_periodo,
         fecha=nuevo_periodo.fecha_inicio,
@@ -1047,6 +1031,9 @@ def _crear_asiento_apertura(nuevo_periodo, periodo_anterior, request):
         messages.error(request, f"¡Error Crítico! El Asiento de Apertura N° {asiento_apertura.numero_partida} está DESCUADRADO (Debe: {total_debe_apertura}, Haber: {total_haber_apertura}). Revise los saldos y asientos de cierre.")
     else:
         messages.success(request, f"Se generó el Asiento de Apertura N° {asiento_apertura.numero_partida} en el nuevo período.")
+# --- 
+# --- FIN DE MODIFICACIÓN: Función _crear_asiento_apertura REESCRITA
+# --- 
 
 
 # --- ========================================= ---
