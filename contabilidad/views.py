@@ -509,7 +509,11 @@ def hub_balance_general(request):
 @login_required
 @user_passes_test(check_acceso_contable) 
 def flujo_efectivo(request, periodo_id):
-    # ... (Sin cambios) ...
+    """
+    Muestra el reporte de Flujo de Efectivo (Método Directo Simplificado)
+    analizando las contrapartidas de las cuentas de efectivo.
+    """
+    
     periodo = get_object_or_404(PeriodoContable, pk=periodo_id)
     
     cuentas_efectivo_ids = Cuenta.objects.filter(
@@ -517,6 +521,7 @@ def flujo_efectivo(request, periodo_id):
     ).values_list('id', flat=True)
 
     periodo_anterior = PeriodoContable.objects.filter(
+        estado=PeriodoContable.EstadoPeriodo.CERRADO,
         fecha_fin__lt=periodo.fecha_inicio
     ).order_by('-fecha_fin').first()
     
