@@ -427,7 +427,6 @@ def estado_resultados(request, periodo_id):
 @login_required
 @user_passes_test(check_acceso_contable) 
 def hub_estado_resultados(request):
-    # ... (Sin cambios) ...
     if request.method == 'POST':
         periodo_id = request.POST.get('periodo_id')
         if periodo_id:
@@ -439,7 +438,10 @@ def hub_estado_resultados(request):
         else:
             messages.error(request, "Debe seleccionar un período.")
     
-    periodos = PeriodoContable.objects.all().order_by('-fecha_inicio')
+    periodos = PeriodoContable.objects.filter(
+        estado=PeriodoContable.EstadoPeriodo.CERRADO
+    ).order_by('-fecha_inicio')
+    
     context = {
         'periodos': periodos
     }
@@ -495,12 +497,14 @@ def hub_balance_general(request):
         else:
             messages.error(request, "Debe seleccionar un período.")
     
-    periodos = PeriodoContable.objects.all().order_by('-fecha_inicio')
+    periodos = PeriodoContable.objects.filter(
+        estado=PeriodoContable.EstadoPeriodo.CERRADO
+    ).order_by('-fecha_inicio')
+
     context = {
         'periodos': periodos
     }
     return render(request, 'contabilidad/hub_balance_general.html', context)
-
 
 @login_required
 @user_passes_test(check_acceso_contable) 
@@ -607,7 +611,10 @@ def hub_flujo_efectivo(request):
         else:
             messages.error(request, "Debe seleccionar un período.")
     
-    periodos = PeriodoContable.objects.all().order_by('-fecha_inicio')
+    periodos = PeriodoContable.objects.filter(
+        estado=PeriodoContable.EstadoPeriodo.CERRADO
+    ).order_by('-fecha_inicio')
+
     context = {
         'periodos': periodos
     }
@@ -628,7 +635,10 @@ def hub_estado_patrimonio(request):
         else:
             messages.error(request, "Debe seleccionar un período.")
     
-    periodos = PeriodoContable.objects.all().order_by('-fecha_inicio')
+    periodos = PeriodoContable.objects.filter(
+        estado=PeriodoContable.EstadoPeriodo.CERRADO
+    ).order_by('-fecha_inicio')
+
     context = {
         'periodos': periodos
     }
