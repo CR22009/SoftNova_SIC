@@ -147,7 +147,7 @@ class Command(BaseCommand):
                     (prestamo, 0, monto_prestamo),
                     (capital, 0, monto_capital),
                 ],
-                es_automatico=True
+                es_automatico=False
             )
 
             # Transacción 2: Venta de Software (Día 3)
