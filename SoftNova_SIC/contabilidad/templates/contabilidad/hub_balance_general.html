@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+
+{% block title %}Seleccionar Período - Balance General{% endblock %}
+
+{% block content %}
+<div class="p-6 md:p-10 max-w-4xl mx-auto">
+    
+    <!-- Encabezado de la Página -->
+    <header class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-800">Balance General</h1>
+        <p class="text-lg text-gray-500">
+            Selecciona el período contable que deseas consultar.
+        </p>
+    </header>
+
+    <!-- Selector de Período -->
+    <div class="bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden">
+        <!-- Apunta a la nueva vista 'hub_balance_general' -->
+        <form method="POST" action="{% url 'contabilidad:hub_balance_general' %}" class="p-6">
+            {% csrf_token %}
+            
+            <!-- Mensajes de Error (si los hay) -->
+            {% if messages %}
+                <div class="mb-4">
+                    {% for message in messages %}
+                        {% if message.level == DEFAULT_MESSAGE_LEVELS.ERROR %}
+                        <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4" role="alert">
+                            <p class="font-bold">Error</p>
+                            <p>{{ message }}</p>
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <!-- Campo del Formulario -->
+            <div class="mb-5">
+                <label for="periodo_id" class="block text-sm font-medium text-gray-700 mb-2">
+                    Período Contable
+                </label>
+                <select id="periodo_id" name="periodo_id" 
+                        class="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sic-dark-blue focus:border-transparent transition duration-200 ease-in-out"
+                        required>
+                    <option value="">-- Selecciona un período --</option>
+                    {% for periodo in periodos %}
+                        <option value="{{ periodo.id }}">{{ periodo.nombre }} ({{ periodo.fecha_inicio|date:"d/m/Y" }} al {{ periodo.fecha_fin|date:"d/m/Y" }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Botón de Envío -->
+            <div class="flex justify-end">
+                <button type="submit" 
+                        class="px-6 py-3 bg-sic-medium-blue text-white font-semibold rounded-lg shadow-md hover:bg-sic-dark-blue focus:outline-none focus:ring-2 focus:ring-sic-dark-blue focus:ring-opacity-75 transition duration-300 ease-in-out transform hover:-translate-y-0.5">
+                    Generar Reporte
+                </button>
+            </div>
+        </form>
+    </div>
+
+</div>
+{% endblock %}

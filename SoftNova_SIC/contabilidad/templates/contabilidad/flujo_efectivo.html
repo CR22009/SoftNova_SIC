@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block title %}Flujo de Efectivo - SoftNova SIC{% endblock %}
+
+{% block page_title %}Estado de Flujo de Efectivo{% endblock %}
+
+{% block content %}
+<div class="p-6 md:p-10 max-w-5xl mx-auto">
+
+    <!-- Encabezado del Reporte -->
+    <div class="bg-white p-6 rounded-lg shadow-md mb-8 border-t-4 border-sic-primary">
+        <div class="text-center">
+            <h2 class="text-2xl font-bold text-sic-darkest-blue">SoftNova S.A. de C.V.</h2>
+            <h3 class="text-xl font-semibold text-sic-dark-blue mt-1">Estado de Flujo de Efectivo</h3>
+            <p class="text-lg text-gray-600">Por el período del {{ periodo.fecha_inicio|date:"d \d\e F \d\e Y" }} al {{ periodo.fecha_fin|date:"d \d\e F \d\e Y" }}</p>
+            <p class="text-sm text-gray-500 mt-1">(Cifras expresadas en Dólares de Estados Unidos)</p>
+        </div>
+    </div>
+
+    <!-- Cuerpo del Reporte -->
+    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+        
+        <!-- Saldo Inicial -->
+        <div class="flex justify-between items-center p-4 bg-gray-50 border-b">
+            <span class="text-lg font-semibold text-sic-dark-blue">Saldo de Efectivo al inicio del período</span>
+            <span class="text-lg font-semibold text-sic-dark-blue">${{ saldo_inicial_efectivo|floatformat:2 }}</span>
+        </div>
+
+        <!-- 1. Flujos de Operación -->
+        <div class="p-4">
+            <h4 class="text-lg font-semibold text-sic-primary mb-3">Flujos de Efectivo de Actividades de Operación:</h4>
+            <div class="pl-4 border-l-2 border-sic-primary">
+                {% if flujos_operacion %}
+                    {% for flujo in flujos_operacion %}
+                    <div class="flex justify-between py-1 text-gray-700">
+                        <span>{{ flujo.nombre }}</span>
+                        <!-- Si el monto es negativo (salida de dinero), se muestra entre paréntesis -->
+                        <span class="font-mono {% if flujo.monto < 0 %}text-red-600{% endif %}">
+                            {% if flujo.monto < 0 %}
+                                (${{ flujo.monto|floatformat:2|slice:"1:" }})
+                            {% else %}
+                                ${{ flujo.monto|floatformat:2 }}
+                            {% endif %}
+                        </span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-gray-500 italic">No hubo flujos de operación.</p>
+                {% endif %}
+            </div>
+            <!-- Subtotal Operación -->
+            <div class="flex justify-between items-center p-2 mt-3 bg-gray-100 rounded-md">
+                <span class="font-bold text-sic-dark-blue">Efectivo Neto de Actividades de Operación</span>
+                <span class="font-bold font-mono {% if total_operacion < 0 %}text-red-600{% else %}text-sic-dark-blue{% endif %}">
+                    {% if total_operacion < 0 %}
+                        (${{ total_operacion|floatformat:2|slice:"1:" }})
+                    {% else %}
+                        ${{ total_operacion|floatformat:2 }}
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+
+        <!-- 2. Flujos de Inversión -->
+        <div class="p-4 border-t">
+            <h4 class="text-lg font-semibold text-sic-secondary mb-3">Flujos de Efectivo de Actividades de Inversión:</h4>
+            <div class="pl-4 border-l-2 border-sic-secondary">
+                {% if flujos_inversion %}
+                    {% for flujo in flujos_inversion %}
+                    <div class="flex justify-between py-1 text-gray-700">
+                        <span>{{ flujo.nombre }}</span>
+                        <span class="font-mono {% if flujo.monto < 0 %}text-red-600{% endif %}">
+                            {% if flujo.monto < 0 %}
+                                (${{ flujo.monto|floatformat:2|slice:"1:" }})
+                            {% else %}
+                                ${{ flujo.monto|floatformat:2 }}
+                            {% endif %}
+                        </span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-gray-500 italic">No hubo flujos de inversión.</p>
+                {% endif %}
+            </div>
+            <!-- Subtotal Inversión -->
+            <div class="flex justify-between items-center p-2 mt-3 bg-gray-100 rounded-md">
+                <span class="font-bold text-sic-dark-blue">Efectivo Neto de Actividades de Inversión</span>
+                <span class="font-bold font-mono {% if total_inversion < 0 %}text-red-600{% else %}text-sic-dark-blue{% endif %}">
+                    {% if total_inversion < 0 %}
+                        (${{ total_inversion|floatformat:2|slice:"1:" }})
+                    {% else %}
+                        ${{ total_inversion|floatformat:2 }}
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+
+        <!-- 3. Flujos de Financiación -->
+        <div class="p-4 border-t">
+            <h4 class="text-lg font-semibold text-sic-dark-blue mb-3">Flujos de Efectivo de Actividades de Financiación:</h4>
+            <div class="pl-4 border-l-2 border-sic-dark-blue">
+                {% if flujos_financiacion %}
+                    {% for flujo in flujos_financiacion %}
+                    <div class="flex justify-between py-1 text-gray-700">
+                        <span>{{ flujo.nombre }}</span>
+                        <span class="font-mono {% if flujo.monto < 0 %}text-red-600{% endif %}">
+                            {% if flujo.monto < 0 %}
+                                (${{ flujo.monto|floatformat:2|slice:"1:" }})
+                            {% else %}
+                                ${{ flujo.monto|floatformat:2 }}
+                            {% endif %}
+                        </span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-gray-500 italic">No hubo flujos de financiación.</p>
+                {% endif %}
+            </div>
+            <!-- Subtotal Financiación -->
+            <div class="flex justify-between items-center p-2 mt-3 bg-gray-100 rounded-md">
+                <span class="font-bold text-sic-dark-blue">Efectivo Neto de Actividades de Financiación</span>
+                <span class="font-bold font-mono {% if total_financiacion < 0 %}text-red-600{% else %}text-sic-dark-blue{% endif %}">
+                    {% if total_financiacion < 0 %}
+                        (${{ total_financiacion|floatformat:2|slice:"1:" }})
+                    {% else %}
+                        ${{ total_financiacion|floatformat:2 }}
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+
+        <!-- Resumen de Flujo Neto -->
+        <div class="flex justify-between items-center p-4 bg-gray-200 border-t-2">
+            <span class="text-lg font-bold text-sic-darkest-blue">Incremento (Disminución) Neto de Efectivo</span>
+            <span class="text-lg font-bold font-mono {% if total_flujo_neto < 0 %}text-red-600{% else %}text-sic-darkest-blue{% endif %}">
+                {% if total_flujo_neto < 0 %}
+                    (${{ total_flujo_neto|floatformat:2|slice:"1:" }})
+                {% else %}
+                    ${{ total_flujo_neto|floatformat:2 }}
+                {% endif %}
+            </span>
+        </div>
+
+        <!-- Saldo Final y Verificación -->
+        <div class="flex justify-between items-center p-4 bg-gray-50 border-t">
+            <span class="text-lg font-semibold text-sic-dark-blue">Saldo de Efectivo al final del período</span>
+            <span class="text-lg font-semibold text-sic-dark-blue">${{ flujo_calculado|floatformat:2 }}</span>
+        </div>
+
+        <!-- Verificación (Solo para nosotros, o para mostrar si no cuadra) -->
+        <div class="p-4 border-t text-sm {% if esta_cuadrado %}bg-green-50 text-green-700{% else %}bg-red-50 text-red-700{% endif %}">
+            <h5 class="font-semibold mb-2">Verificación del Reporte:</h5>
+            <div class="flex justify-between"><span>Saldo Inicial de Efectivo:</span> <span>${{ saldo_inicial_efectivo|floatformat:2 }}</span></div>
+            <div class="flex justify-between"><span>(+) Flujo Neto del Período:</span> <span>${{ total_flujo_neto|floatformat:2 }}</span></div>
+            <div class="flex justify-between border-t mt-1 pt-1"><span>(=) Saldo Final Calculado:</span> <span>${{ flujo_calculado|floatformat:2 }}</span></div>
+            <div class="flex justify-between mt-2"><span>Saldo Final Real (según Mayor):</span> <span>${{ saldo_final_efectivo|floatformat:2 }}</span></div>
+            
+            {% if esta_cuadrado %}
+                <p class="font-bold mt-2 text-center">¡Reporte Cuadrado!</p>
+            {% else %}
+                <div class="flex justify-between mt-2 font-bold text-red-800 bg-red-100 p-2 rounded">
+                    <span>Diferencia (Descuadre):</span>
+                    <span>${{ diferencia|floatformat:2 }}</span>
+                </div>
+            {% endif %}
+        </div>
+
+    </div>
+
+</div>
+{% endblock %}
